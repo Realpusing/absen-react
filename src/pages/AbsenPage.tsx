@@ -50,6 +50,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   const [selectedKegiatanId, setSelectedKegiatanId] = useState<number | null>(null);
   const [bulkLoadingCluster, setBulkLoadingCluster] = useState<ClusterType | null>(null);
 
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportTanggalMulai, setExportTanggalMulai] = useState(getTodayDate());
+  const [exportTanggalSelesai, setExportTanggalSelesai] = useState(getTodayDate());
+  const [penanggungJawab, setPenanggungJawab] = useState("");
+  const [jabatanPenanggungJawab, setJabatanPenanggungJawab] = useState("");
+  const [showPenanggungJawabList, setShowPenanggungJawabList] = useState(false);
+
   const todayDate = getTodayDate();
 
   const fetchAbsenByDate = async (date: string) => {
@@ -119,6 +126,14 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     return pegawaiList.filter((p) => ids.includes(p.id));
   }, [pegawaiList, selectedKegiatanId, kegiatanPegawaiRows]);
 
+  const filteredPegawai = absenPegawaiList.filter((p) =>
+    p.nama_pegawai.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredPenanggungJawab = pegawaiList.filter((pegawai) =>
+    pegawai.nama_pegawai.toLowerCase().includes(penanggungJawab.toLowerCase())
+  );
+
   const getAbsenStatus = (pegawaiId: number): KeteranganAbsen | null => {
     const found = filteredAbsen.find((a) => a.pegawai_id === pegawaiId);
     return found ? found.keterangan : null;
@@ -184,10 +199,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     try {
       const pegawaiIds = clusterPegawai.map((p) => p.id);
 
-      let existingRows = filteredAbsen.filter((a) => pegawaiIds.includes(a.pegawai_id));
+      const existingRows = filteredAbsen.filter((a) =>
+        pegawaiIds.includes(a.pegawai_id)
+      );
 
       if (existingRows.length > 0) {
         const idsToDelete = existingRows.map((a) => a.id);
+
         const { error: deleteError } = await supabase
           .from("absen")
           .delete()
@@ -207,7 +225,9 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         kegiatan_id: selectedKegiatanId,
       }));
 
-      const { error: insertError } = await supabase.from("absen").insert(payload);
+      const { error: insertError } = await supabase
+        .from("absen")
+        .insert(payload);
 
       if (insertError) {
         alert("Gagal set absen cluster: " + insertError.message);
@@ -232,7 +252,9 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
 
     try {
       const pegawaiIds = clusterPegawai.map((p) => p.id);
-      const rowsToDelete = filteredAbsen.filter((a) => pegawaiIds.includes(a.pegawai_id));
+      const rowsToDelete = filteredAbsen.filter((a) =>
+        pegawaiIds.includes(a.pegawai_id)
+      );
 
       if (rowsToDelete.length === 0) {
         setBulkLoadingCluster(null);
@@ -264,12 +286,49 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     setSelectedDate(d.toISOString().split("T")[0]);
   };
 
-  const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
+  const handleSelectPenanggungJawab = (pegawai: Pegawai) => {
+    setPenanggungJawab(pegawai.nama_pegawai);
+    setJabatanPenanggungJawab(pegawai.jabatan || "");
+    setShowPenanggungJawabList(false);
+  };
 
-  const kegiatanLabel =
-    selectedKegiatanId === null
-      ? "Absensi Harian"
-      : `Absensi: ${selectedKegiatan?.nama_kegiatan}`;
+  const handleExportExcel = () => {
+    setExportTanggalMulai(selectedDate);
+    setExportTanggalSelesai(selectedDate);
+    setShowExportModal(true);
+  };
+
+  const confirmExportExcel = () => {
+    exportToExcel({
+      pegawaiList: absenPegawaiList,
+      absenList: filteredAbsen,
+      kegiatanLabel:
+        selectedKegiatanId === null
+          ? "Rekap Absen Apel"
+          : selectedKegiatan?.nama_kegiatan || "Rekap Absen",
+      tanggalMulai: exportTanggalMulai,
+      tanggalSelesai: exportTanggalSelesai,
+      penanggungJawab,
+      jabatanPenanggungJawab,
+      hariKerja: 22,
+    });
+  
+    setShowExportModal(false);
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF({
+      absenPegawaiList,
+      getAbsenStatus,
+      selectedDate,
+      kegiatanLabel:
+        selectedKegiatanId === null
+          ? "Absensi Harian"
+          : selectedKegiatan?.nama_kegiatan || "Kegiatan",
+    });
+  };
+
+  const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
 
   const stats = {
     total: absenPegawaiList.length,
@@ -281,31 +340,6 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     belum: absenPegawaiList.length - filteredAbsen.length,
   };
 
-  const filteredPegawai = absenPegawaiList.filter((p) =>
-    p.nama_pegawai.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleExportExcel = () => {
-    exportToExcel({
-      absenPegawaiList,
-      getAbsenStatus,
-      selectedDate,
-      kegiatanLabel:
-        selectedKegiatanId === null
-          ? "Harian"
-          : selectedKegiatan?.nama_kegiatan || "Kegiatan",
-    });
-  };
-
-  const handleExportPDF = () => {
-    exportToPDF({
-      absenPegawaiList,
-      getAbsenStatus,
-      selectedDate,
-      kegiatanLabel,
-    });
-  };
-
   const getAssignedCount = (kegiatanId: number) => {
     return kegiatanPegawaiRows.filter((row) => row.kegiatan_id === kegiatanId).length;
   };
@@ -315,7 +349,11 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       <div className="glass page-header-card">
         <div className="header-top">
           <div>
-            <h1 className="page-title">{kegiatanLabel}</h1>
+            <h1 className="page-title">
+              {selectedKegiatanId === null
+                ? "Absensi Harian"
+                : `Absensi: ${selectedKegiatan?.nama_kegiatan}`}
+            </h1>
             <p className="page-subtitle">{formatDateID(selectedDate)}</p>
           </div>
 
@@ -394,9 +432,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
           <div className="stat-card" key={s.label}>
             <div>
               <p className="stat-label">{s.label}</p>
-              <h3 className="stat-value" style={{ color: s.color }}>{s.value}</h3>
+              <h3 className="stat-value" style={{ color: s.color }}>
+                {s.value}
+              </h3>
             </div>
-            <div className="stat-icon" style={{ background: s.color }}>{s.icon}</div>
+            <div className="stat-icon" style={{ background: s.color }}>
+              {s.icon}
+            </div>
           </div>
         ))}
       </div>
@@ -429,12 +471,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         const cfg = clusterConfig[cluster];
         const Icon = cfg.icon;
         const list = filteredPegawai
-        .filter((p) => p.cluster === cluster)
-        .sort((a, b) => {
+          .filter((p) => p.cluster === cluster)
+          .sort((a, b) => {
             const urutanA = a.urutan ?? 999999;
             const urutanB = b.urutan ?? 999999;
             return urutanA - urutanB;
-        });
+          });
 
         if (list.length === 0) return null;
 
@@ -597,6 +639,116 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
           <p style={{ color: "#64748b", fontSize: 16 }}>
             Belum ada pegawai yang di-assign ke kegiatan ini.
           </p>
+        </div>
+      )}
+
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div
+            className="modal-content export-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header export-header">
+              <div>
+                <h2>Export Excel Absensi</h2>
+                <p className="export-subtitle">
+                  Pilih periode dan penanggung jawab sebelum download file
+                </p>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setShowExportModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="export-form-grid">
+              <div className="export-field">
+                <label className="export-label">Tanggal Mulai</label>
+                <input
+                  type="date"
+                  value={exportTanggalMulai}
+                  onChange={(e) => setExportTanggalMulai(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="export-field">
+                <label className="export-label">Tanggal Selesai</label>
+                <input
+                  type="date"
+                  value={exportTanggalSelesai}
+                  onChange={(e) => setExportTanggalSelesai(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="export-field export-autocomplete-wrapper">
+                <label className="export-label">Nama Penanggung Jawab</label>
+                <input
+                  type="text"
+                  value={penanggungJawab}
+                  onChange={(e) => {
+                    setPenanggungJawab(e.target.value);
+                    setShowPenanggungJawabList(true);
+                  }}
+                  onFocus={() => setShowPenanggungJawabList(true)}
+                  placeholder="Ketik nama pegawai..."
+                  className="form-input"
+                />
+
+                {showPenanggungJawabList && penanggungJawab && (
+                  <div className="autocomplete-dropdown">
+                    {filteredPenanggungJawab.length > 0 ? (
+                      filteredPenanggungJawab.slice(0, 8).map((pegawai) => (
+                        <button
+                          key={pegawai.id}
+                          type="button"
+                          className="autocomplete-item"
+                          onClick={() => handleSelectPenanggungJawab(pegawai)}
+                        >
+                          <div className="autocomplete-name">
+                            {pegawai.nama_pegawai}
+                          </div>
+                          <div className="autocomplete-detail">
+                            {pegawai.jabatan || "-"} • {pegawai.nip}
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="autocomplete-empty">
+                        Pegawai tidak ditemukan
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="export-field">
+                <label className="export-label">Jabatan Penanggung Jawab</label>
+                <input
+                  type="text"
+                  value={jabatanPenanggungJawab}
+                  onChange={(e) => setJabatanPenanggungJawab(e.target.value)}
+                  placeholder="Otomatis terisi dari pegawai"
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            <div className="export-footer">
+              <button className="btn-primary" onClick={confirmExportExcel}>
+                Download Excel
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowExportModal(false)}
+              >
+                Batal
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
