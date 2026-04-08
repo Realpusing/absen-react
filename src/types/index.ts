@@ -5,6 +5,7 @@ export type KeteranganAbsen =
   | "Cuti"
   | "Izin"
   | "Sakit"
+  | "Lepas Absen"
   | "Alpha";
 
 export type ClusterType = "Pimpinan" | "Umum" | "Sumber Daya" | "Operasi";
