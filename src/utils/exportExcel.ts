@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import type { Pegawai, Absen, KeteranganAbsen } from "../types";
 import { clusterOptions } from "../constants";
+import logoBsn from "../assets/logo_bsn.png";  // ← IMPORT LOGO
 
 interface ExportRekapParams {
   pegawaiList: Pegawai[];
@@ -130,7 +131,6 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        // hasil data:image/png;base64,xxxx
         const base64 = result.split(",")[1];
         resolve(base64);
       };
@@ -162,22 +162,22 @@ export async function exportToExcel({
   worksheet.pageSetup.fitToPage = true;
 
   worksheet.columns = [
-    { width: 6 },   // A NO
-    { width: 6 },   // B NO internal
-    { width: 40 },  // C NAMA
-    { width: 24 },  // D NIP
-    { width: 10 },  // E HADIR
-    { width: 14 },  // F DINAS LUAR
-    { width: 14 },  // G DINAS DALAM
-    { width: 9 },   // H CUTI
-    { width: 9 },   // I SAKIT
-    { width: 9 },   // J ALPA
-    { width: 9 },   // K IZIN
-    { width: 18 },  // M TOTAL KEHADIRAN
+    { width: 6 },
+    { width: 6 },
+    { width: 40 },
+    { width: 24 },
+    { width: 10 },
+    { width: 14 },
+    { width: 14 },
+    { width: 9 },
+    { width: 9 },
+    { width: 9 },
+    { width: 9 },
+    { width: 18 },
   ];
 
   // HEADER ATAS
-  worksheet.mergeCells("A1:M2");
+  worksheet.mergeCells("A1:L2");  // ← Ubah M jadi L (12 kolom)
   const topCell = worksheet.getCell("A1");
   topCell.value = "";
   topCell.alignment = { horizontal: "center", vertical: "middle" };
@@ -188,8 +188,8 @@ export async function exportToExcel({
     right: { style: "thin", color: { argb: GREEN } },
   };
 
-  // LOGO
-  const logoBase64 = await imageUrlToBase64("/logo_bsn.png");
+  // LOGO - GUNAKAN IMPORT
+  const logoBase64 = await imageUrlToBase64(logoBsn);  // ← UBAH INI
   if (logoBase64) {
     const imageId = workbook.addImage({
       base64: logoBase64,
@@ -197,13 +197,13 @@ export async function exportToExcel({
     });
 
     worksheet.addImage(imageId, {
-      tl: { col: 6.15, row: 0.12 },
+      tl: { col: 5.5, row: 0.12 },  // ← Sesuaikan posisi (12 kolom)
       ext: { width: 58, height: 58 },
     });
   }
 
   // JUDUL
-  worksheet.mergeCells("A4:M4");
+  worksheet.mergeCells("A4:L4");  // ← Ubah M jadi L
   worksheet.getCell("A4").value = kegiatanLabel.toUpperCase();
   worksheet.getCell("A4").font = {
     bold: true,
@@ -215,7 +215,7 @@ export async function exportToExcel({
     vertical: "middle",
   };
 
-  worksheet.mergeCells("A5:M5");
+  worksheet.mergeCells("A5:L5");  // ← Ubah M jadi L
   worksheet.getCell("A5").value = "KANTOR PENCARIAN DAN PERTOLONGAN TARAKAN";
   worksheet.getCell("A5").font = {
     bold: true,
@@ -227,7 +227,7 @@ export async function exportToExcel({
     vertical: "middle",
   };
 
-  worksheet.mergeCells("A6:M6");
+  worksheet.mergeCells("A6:L6");  // ← Ubah M jadi L
   const bulanTahun = new Date(tanggalMulai).toLocaleDateString("id-ID", {
     month: "long",
     year: "numeric",
@@ -244,7 +244,7 @@ export async function exportToExcel({
   };
 
   // HARI KERJA
-  worksheet.mergeCells("A8:M8");
+  worksheet.mergeCells("A8:L8");  // ← Ubah M jadi L
   const hariCell = worksheet.getCell("A8");
   hariCell.value = `HARI KERJA : ${hariKerja} HARI`;
   hariCell.font = {
@@ -279,7 +279,6 @@ export async function exportToExcel({
 
     const rekap = buildRekap(list, absenList);
 
-    // HEADER TABEL
     const headerRow = worksheet.getRow(currentRow);
     const headers = [
       "NO",
@@ -330,7 +329,7 @@ export async function exportToExcel({
         cell.value = value;
 
         const isText = index === 2 || index === 3;
-        const isTotal = index === 12;
+        const isTotal = index === 11;  // ← Ubah dari 12 jadi 11
 
         styleBody(cell, isText ? "left" : "center", isTotal);
       });
@@ -345,32 +344,32 @@ export async function exportToExcel({
   // TTD
   currentRow += 2;
 
-  worksheet.mergeCells(`J${currentRow}:M${currentRow}`);
-  worksheet.getCell(`J${currentRow}`).value = "Mengetahui,";
-  worksheet.getCell(`J${currentRow}`).alignment = {
+  worksheet.mergeCells(`I${currentRow}:L${currentRow}`);  // ← Ubah J:M jadi I:L
+  worksheet.getCell(`I${currentRow}`).value = "Mengetahui,";
+  worksheet.getCell(`I${currentRow}`).alignment = {
     horizontal: "center",
     vertical: "middle",
   };
 
   currentRow++;
 
-  worksheet.mergeCells(`J${currentRow}:M${currentRow}`);
-  worksheet.getCell(`J${currentRow}`).value = jabatanPenanggungJawab || "";
-  worksheet.getCell(`J${currentRow}`).alignment = {
+  worksheet.mergeCells(`I${currentRow}:L${currentRow}`);  // ← Ubah J:M jadi I:L
+  worksheet.getCell(`I${currentRow}`).value = jabatanPenanggungJawab || "";
+  worksheet.getCell(`I${currentRow}`).alignment = {
     horizontal: "center",
     vertical: "middle",
   };
 
   currentRow += 4;
 
-  worksheet.mergeCells(`J${currentRow}:M${currentRow}`);
-  worksheet.getCell(`J${currentRow}`).value = penanggungJawab || "";
-  worksheet.getCell(`J${currentRow}`).font = {
+  worksheet.mergeCells(`I${currentRow}:L${currentRow}`);  // ← Ubah J:M jadi I:L
+  worksheet.getCell(`I${currentRow}`).value = penanggungJawab || "";
+  worksheet.getCell(`I${currentRow}`).font = {
     bold: true,
     size: 12,
     color: { argb: BLACK },
   };
-  worksheet.getCell(`J${currentRow}`).alignment = {
+  worksheet.getCell(`I${currentRow}`).alignment = {
     horizontal: "center",
     vertical: "middle",
   };
