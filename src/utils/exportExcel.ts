@@ -23,7 +23,6 @@ type RekapItem = {
   sakit: number;
   alpha: number;
   izin: number;
-  lepasPiket: number;
   totalKehadiran: number;
 };
 
@@ -47,7 +46,6 @@ function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
     const sakit = countStatus(absenList, pegawai.id, "Sakit");
     const alpha = countStatus(absenList, pegawai.id, "Alpha");
     const izin = countStatus(absenList, pegawai.id, "Izin");
-    const lepasPiket = countStatus(absenList, pegawai.id, "Lepas Piket");
 
     return {
       pegawai,
@@ -58,8 +56,7 @@ function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
       sakit,
       alpha,
       izin,
-      lepasPiket,
-      totalKehadiran: hadir + dinasLuar + dinasDalam + lepasPiket,
+      totalKehadiran: hadir + dinasLuar + dinasDalam,
     };
   });
 }
@@ -176,7 +173,6 @@ export async function exportToExcel({
     { width: 9 },   // I SAKIT
     { width: 9 },   // J ALPA
     { width: 9 },   // K IZIN
-    { width: 14 },  // L LEPAS PIKET
     { width: 18 },  // M TOTAL KEHADIRAN
   ];
 
@@ -297,7 +293,6 @@ export async function exportToExcel({
       "SAKIT",
       "ALPA",
       "IZIN",
-      "LEPAS PIKET",
       "TOTAL KEHADIRAN",
     ];
 
@@ -327,7 +322,6 @@ export async function exportToExcel({
         item.sakit,
         item.alpha,
         item.izin,
-        item.lepasPiket,
         item.totalKehadiran,
       ];
 
