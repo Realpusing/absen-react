@@ -33,10 +33,12 @@ export interface Absen {
 }
 
 export interface Kegiatan {
-  id: number;
-  nama_kegiatan: string;
-  deskripsi: string;
-  tanggal_mulai: string | null;
-  tanggal_selesai: string | null;
-  created_at?: string;
-}
+    id: number;
+    nama_kegiatan: string;
+    deskripsi?: string;
+    tanggal_pelaksanaan?: string;
+    instruktur_id?: number;   // FK ke pegawai
+    asisten_id?: number;      // FK ke pegawai
+    materi?: string;
+    created_at?: string;
+  }

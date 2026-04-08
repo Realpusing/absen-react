@@ -72,9 +72,11 @@ export const initialPegawaiForm = {
     urutan: 0,
   };
 
-export const initialKegiatanForm = {
-  nama_kegiatan: "",
-  deskripsi: "",
-  tanggal_mulai: "",
-  tanggal_selesai: "",
-};
+  export const initialKegiatanForm = {
+    nama_kegiatan: "",
+    deskripsi: "",
+    tanggal_pelaksanaan: "",
+    instruktur_id: "",   // string karena dari select value
+    asisten_id: "",
+    materi: "",
+  };
