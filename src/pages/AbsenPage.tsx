@@ -11,6 +11,7 @@ import {
   FileText,
   XCircle,
   Check,
+  Table as TableIcon,
 } from "lucide-react";
 import { supabase } from "../supabase";
 import type {
@@ -19,6 +20,8 @@ import type {
   Kegiatan,
   KeteranganAbsen,
   ClusterType,
+  KolomAbsen,
+  Absensi,
 } from "../types";
 import {
   clusterOptions,
@@ -42,14 +45,34 @@ interface Props {
 }
 
 export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
+  // ══════════════════════════════════════════════════════════════
+  // STATE - ABSEN HARIAN
+  // ══════════════════════════════════════════════════════════════
+  
   const [absenList, setAbsenList] = useState<Absen[]>([]);
-  const [kegiatanList, setKegiatanList] = useState<Kegiatan[]>([]);
-  const [kegiatanPegawaiRows, setKegiatanPegawaiRows] = useState<KegiatanPegawaiRow[]>([]);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedKegiatanId, setSelectedKegiatanId] = useState<number | null>(null);
   const [bulkLoadingCluster, setBulkLoadingCluster] = useState<ClusterType | null>(null);
 
+  // ══════════════════════════════════════════════════════════════
+  // STATE - KEGIATAN
+  // ══════════════════════════════════════════════════════════════
+  
+  const [kegiatanList, setKegiatanList] = useState<Kegiatan[]>([]);
+  const [kegiatanPegawaiRows, setKegiatanPegawaiRows] = useState<KegiatanPegawaiRow[]>([]);
+  const [selectedKegiatanId, setSelectedKegiatanId] = useState<number | null>(null);
+
+  // ══════════════════════════════════════════════════════════════
+  // STATE - KOLOM DINAMIS & ABSENSI KEGIATAN
+  // ══════════════════════════════════════════════════════════════
+  
+  const [kolomAbsenList, setKolomAbsenList] = useState<KolomAbsen[]>([]);
+  const [absensiKegiatanData, setAbsensiKegiatanData] = useState<Absensi[]>([]);
+
+  // ══════════════════════════════════════════════════════════════
+  // STATE - EXPORT
+  // ══════════════════════════════════════════════════════════════
+  
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportTanggalMulai, setExportTanggalMulai] = useState(getTodayDate());
   const [exportTanggalSelesai, setExportTanggalSelesai] = useState(getTodayDate());
@@ -58,6 +81,10 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   const [showPenanggungJawabList, setShowPenanggungJawabList] = useState(false);
 
   const todayDate = getTodayDate();
+
+  // ══════════════════════════════════════════════════════════════
+  // FETCH FUNCTIONS
+  // ══════════════════════════════════════════════════════════════
 
   const fetchAbsenByDate = async (date: string) => {
     const { data, error } = await supabase
@@ -100,6 +127,38 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     setKegiatanPegawaiRows((data as KegiatanPegawaiRow[]) || []);
   };
 
+  const fetchKolomAbsen = async (kegiatanId: number) => {
+    const { data, error } = await supabase
+      .from("kolom_absen")
+      .select("*")
+      .eq("kegiatan_id", kegiatanId)
+      .order("urutan", { ascending: true });
+
+    if (error) {
+      console.error("Gagal fetch kolom absen:", error.message);
+      return;
+    }
+    setKolomAbsenList((data as KolomAbsen[]) || []);
+  };
+
+  const fetchAbsensiKegiatan = async (kegiatanId: number, tanggal: string) => {
+    const { data, error } = await supabase
+      .from("absensi")
+      .select("*")
+      .eq("kegiatan_id", kegiatanId)
+      .eq("tanggal", tanggal);
+
+    if (error) {
+      console.error("Gagal fetch absensi kegiatan:", error.message);
+      return;
+    }
+    setAbsensiKegiatanData((data as Absensi[]) || []);
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // USE EFFECT
+  // ══════════════════════════════════════════════════════════════
+
   useEffect(() => {
     refreshPegawai();
     fetchKegiatan();
@@ -107,8 +166,22 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   }, []);
 
   useEffect(() => {
-    fetchAbsenByDate(selectedDate);
-  }, [selectedDate]);
+    if (selectedKegiatanId === null) {
+      // Absen harian
+      fetchAbsenByDate(selectedDate);
+      setKolomAbsenList([]);
+      setAbsensiKegiatanData([]);
+    } else {
+      // Absen kegiatan dengan kolom dinamis
+      fetchKolomAbsen(selectedKegiatanId);
+      fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+      setAbsenList([]);
+    }
+  }, [selectedDate, selectedKegiatanId]);
+
+  // ══════════════════════════════════════════════════════════════
+  // COMPUTED VALUES
+  // ══════════════════════════════════════════════════════════════
 
   const filteredAbsen = absenList.filter((a) =>
     selectedKegiatanId === null ? a.kegiatan_id === null : a.kegiatan_id === selectedKegiatanId
@@ -133,6 +206,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   const filteredPenanggungJawab = pegawaiList.filter((pegawai) =>
     pegawai.nama_pegawai.toLowerCase().includes(penanggungJawab.toLowerCase())
   );
+
+  const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
+
+  // ══════════════════════════════════════════════════════════════
+  // HELPER FUNCTIONS - ABSEN HARIAN
+  // ══════════════════════════════════════════════════════════════
 
   const getAbsenStatus = (pegawaiId: number): KeteranganAbsen | null => {
     const found = filteredAbsen.find((a) => a.pegawai_id === pegawaiId);
@@ -182,6 +261,64 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
 
     fetchAbsenByDate(selectedDate);
   };
+
+  // ══════════════════════════════════════════════════════════════
+  // HELPER FUNCTIONS - ABSENSI KEGIATAN (KOLOM DINAMIS)
+  // ══════════════════════════════════════════════════════════════
+
+  const getNilaiAbsensi = (pegawaiId: number, kolomId: number) => {
+    const found = absensiKegiatanData.find(
+      (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
+    );
+    return found?.nilai || "";
+  };
+
+  const updateNilaiAbsensi = async (
+    pegawaiId: number,
+    kolomId: number,
+    nilai: string
+  ) => {
+    if (!selectedKegiatanId) return;
+
+    const existing = absensiKegiatanData.find(
+      (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
+    );
+
+    if (existing) {
+      // Update
+      const { error } = await supabase
+        .from("absensi")
+        .update({ nilai })
+        .eq("id", existing.id);
+
+      if (error) {
+        console.error("Gagal update:", error);
+        return;
+      }
+    } else {
+      // Insert
+      const { error } = await supabase.from("absensi").insert([
+        {
+          kegiatan_id: selectedKegiatanId,
+          pegawai_id: pegawaiId,
+          kolom_absen_id: kolomId,
+          nilai,
+          tanggal: selectedDate,
+        },
+      ]);
+
+      if (error) {
+        console.error("Gagal insert:", error);
+        return;
+      }
+    }
+
+    fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // BULK ACTIONS
+  // ══════════════════════════════════════════════════════════════
 
   const bulkSetAbsenByCluster = async (
     cluster: ClusterType,
@@ -280,11 +417,19 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     }
   };
 
+  // ══════════════════════════════════════════════════════════════
+  // DATE NAVIGATION
+  // ══════════════════════════════════════════════════════════════
+
   const changeDate = (days: number) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + days);
     setSelectedDate(d.toISOString().split("T")[0]);
   };
+
+  // ══════════════════════════════════════════════════════════════
+  // EXPORT
+  // ══════════════════════════════════════════════════════════════
 
   const handleSelectPenanggungJawab = (pegawai: Pegawai) => {
     setPenanggungJawab(pegawai.nama_pegawai);
@@ -312,7 +457,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       jabatanPenanggungJawab,
       hariKerja: 22,
     });
-  
+
     setShowExportModal(false);
   };
 
@@ -328,7 +473,9 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     });
   };
 
-  const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
+  // ══════════════════════════════════════════════════════════════
+  // STATS
+  // ══════════════════════════════════════════════════════════════
 
   const stats = {
     total: absenPegawaiList.length,
@@ -344,8 +491,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     return kegiatanPegawaiRows.filter((row) => row.kegiatan_id === kegiatanId).length;
   };
 
+  // ══════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════
+
   return (
     <div className="page">
+      {/* ── Header ── */}
       <div className="glass page-header-card">
         <div className="header-top">
           <div>
@@ -379,6 +531,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       </div>
 
+      {/* ── Tabs Kegiatan ── */}
       <div className="glass kegiatan-tabs-card">
         <p className="kegiatan-tabs-label">Pilih Absen:</p>
         <div className="kegiatan-tabs">
@@ -404,6 +557,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       </div>
 
+      {/* ── Info Kegiatan ── */}
       {selectedKegiatanId !== null && (
         <div className="glass kegiatan-info-card">
           <div className="kegiatan-info-row">
@@ -421,28 +575,32 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
-      <div className="stats-grid">
-        {[
-          { label: "Total", value: stats.total, color: "#3b82f6", icon: <Users size={22} color="white" /> },
-          { label: "Hadir", value: stats.hadir, color: "#10b981", icon: <CheckCircle2 size={22} color="white" /> },
-          { label: "Izin/Cuti/Sakit", value: stats.izinCutiSakit, color: "#f59e0b", icon: <FileText size={22} color="white" /> },
-          { label: "Alpha", value: stats.alpha, color: "#ef4444", icon: <XCircle size={22} color="white" /> },
-          { label: "Belum Absen", value: stats.belum, color: "#94a3b8", icon: <Calendar size={22} color="white" /> },
-        ].map((s) => (
-          <div className="stat-card" key={s.label}>
-            <div>
-              <p className="stat-label">{s.label}</p>
-              <h3 className="stat-value" style={{ color: s.color }}>
-                {s.value}
-              </h3>
+      {/* ── Stats (Hanya untuk Absen Harian) ── */}
+      {selectedKegiatanId === null && (
+        <div className="stats-grid">
+          {[
+            { label: "Total", value: stats.total, color: "#3b82f6", icon: <Users size={22} color="white" /> },
+            { label: "Hadir", value: stats.hadir, color: "#10b981", icon: <CheckCircle2 size={22} color="white" /> },
+            { label: "Izin/Cuti/Sakit", value: stats.izinCutiSakit, color: "#f59e0b", icon: <FileText size={22} color="white" /> },
+            { label: "Alpha", value: stats.alpha, color: "#ef4444", icon: <XCircle size={22} color="white" /> },
+            { label: "Belum Absen", value: stats.belum, color: "#94a3b8", icon: <Calendar size={22} color="white" /> },
+          ].map((s) => (
+            <div className="stat-card" key={s.label}>
+              <div>
+                <p className="stat-label">{s.label}</p>
+                <h3 className="stat-value" style={{ color: s.color }}>
+                  {s.value}
+                </h3>
+              </div>
+              <div className="stat-icon" style={{ background: s.color }}>
+                {s.icon}
+              </div>
             </div>
-            <div className="stat-icon" style={{ background: s.color }}>
-              {s.icon}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
+      {/* ── Search & Export ── */}
       <div className="glass" style={{ marginBottom: 0 }}>
         <div className="search-export-row">
           <input
@@ -467,173 +625,262 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       </div>
 
-      {clusterOptions.map((cluster) => {
-        const cfg = clusterConfig[cluster];
-        const Icon = cfg.icon;
-        const list = filteredPegawai
-          .filter((p) => p.cluster === cluster)
-          .sort((a, b) => {
-            const urutanA = a.urutan ?? 999999;
-            const urutanB = b.urutan ?? 999999;
-            return urutanA - urutanB;
-          });
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* ABSEN HARIAN (Checkbox Keterangan) */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {selectedKegiatanId === null && (
+        <>
+          {clusterOptions.map((cluster) => {
+            const cfg = clusterConfig[cluster];
+            const Icon = cfg.icon;
+            const list = filteredPegawai
+              .filter((p) => p.cluster === cluster)
+              .sort((a, b) => {
+                const urutanA = a.urutan ?? 999999;
+                const urutanB = b.urutan ?? 999999;
+                return urutanA - urutanB;
+              });
 
-        if (list.length === 0) return null;
+            if (list.length === 0) return null;
 
-        return (
-          <div key={cluster} className="cluster-section">
-            <div
-              className="cluster-header"
-              style={{
-                background: cfg.bg,
-                borderLeft: `4px solid ${cfg.color}`,
-              }}
-            >
-              <div className="cluster-header-left">
+            return (
+              <div key={cluster} className="cluster-section">
                 <div
-                  className="cluster-header-icon"
-                  style={{ background: cfg.gradient }}
+                  className="cluster-header"
+                  style={{
+                    background: cfg.bg,
+                    borderLeft: `4px solid ${cfg.color}`,
+                  }}
                 >
-                  <Icon size={20} color="white" />
+                  <div className="cluster-header-left">
+                    <div
+                      className="cluster-header-icon"
+                      style={{ background: cfg.gradient }}
+                    >
+                      <Icon size={20} color="white" />
+                    </div>
+                    <div>
+                      <h3 className="cluster-header-title" style={{ color: cfg.color }}>
+                        {cluster}
+                      </h3>
+                      <p className="cluster-header-count">{list.length} pegawai</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="cluster-header-title" style={{ color: cfg.color }}>
-                    {cluster}
-                  </h3>
-                  <p className="cluster-header-count">{list.length} pegawai</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="glass cluster-table-card">
-              <div className="cluster-bulk-actions">
-                <button
-                  className="bulk-btn bulk-btn-hadir"
-                  disabled={bulkLoadingCluster === cluster}
-                  onClick={() => bulkSetAbsenByCluster(cluster, "Hadir")}
-                >
-                  ✅ Semua Hadir
-                </button>
+                <div className="glass cluster-table-card">
+                  <div className="cluster-bulk-actions">
+                    <button
+                      className="bulk-btn bulk-btn-hadir"
+                      disabled={bulkLoadingCluster === cluster}
+                      onClick={() => bulkSetAbsenByCluster(cluster, "Hadir")}
+                    >
+                      ✅ Semua Hadir
+                    </button>
 
-                <button
-                  className="bulk-btn bulk-btn-izin"
-                  disabled={bulkLoadingCluster === cluster}
-                  onClick={() => bulkSetAbsenByCluster(cluster, "Izin")}
-                >
-                  🟡 Semua Izin
-                </button>
+                    <button
+                      className="bulk-btn bulk-btn-izin"
+                      disabled={bulkLoadingCluster === cluster}
+                      onClick={() => bulkSetAbsenByCluster(cluster, "Izin")}
+                    >
+                      🟡 Semua Izin
+                    </button>
 
-                <button
-                  className="bulk-btn bulk-btn-alpha"
-                  disabled={bulkLoadingCluster === cluster}
-                  onClick={() => bulkSetAbsenByCluster(cluster, "Alpha")}
-                >
-                  🔴 Semua Alpha
-                </button>
+                    <button
+                      className="bulk-btn bulk-btn-alpha"
+                      disabled={bulkLoadingCluster === cluster}
+                      onClick={() => bulkSetAbsenByCluster(cluster, "Alpha")}
+                    >
+                      🔴 Semua Alpha
+                    </button>
 
-                <button
-                  className="bulk-btn bulk-btn-clear"
-                  disabled={bulkLoadingCluster === cluster}
-                  onClick={() => clearClusterAbsen(cluster)}
-                >
-                  ❌ Hapus Cluster
-                </button>
-              </div>
+                    <button
+                      className="bulk-btn bulk-btn-clear"
+                      disabled={bulkLoadingCluster === cluster}
+                      onClick={() => clearClusterAbsen(cluster)}
+                    >
+                      ❌ Hapus Cluster
+                    </button>
+                  </div>
 
-              <div className="table-wrapper">
-                <table className="absen-table">
-                  <thead>
-                    <tr>
-                      <th className="th-no">No</th>
-                      <th className="th-nama">Nama Pegawai</th>
-                      <th className="th-nip">NIP</th>
-                      <th className="th-jabatan">Jabatan</th>
-                      {keteranganOptions.map((ket) => (
-                        <th key={ket} className="th-status">
-                          <div
-                            className="th-status-label"
-                            style={{ borderBottom: `3px solid ${keteranganColors[ket]}` }}
-                          >
-                            {ket}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.map((pegawai, index) => {
-                      const status = getAbsenStatus(pegawai.id);
-
-                      return (
-                        <tr key={pegawai.id} className="absen-row">
-                          <td className="td-no">{index + 1}</td>
-                          <td className="td-nama">
-                            <div className="nama-cell">
+                  <div className="table-wrapper">
+                    <table className="absen-table">
+                      <thead>
+                        <tr>
+                          <th className="th-no">No</th>
+                          <th className="th-nama">Nama Pegawai</th>
+                          <th className="th-nip">NIP</th>
+                          <th className="th-jabatan">Jabatan</th>
+                          {keteranganOptions.map((ket) => (
+                            <th key={ket} className="th-status">
                               <div
-                                className="avatar"
-                                style={{ background: cfg.gradient }}
+                                className="th-status-label"
+                                style={{ borderBottom: `3px solid ${keteranganColors[ket]}` }}
                               >
-                                {pegawai.nama_pegawai.charAt(0).toUpperCase()}
+                                {ket}
                               </div>
-                              <div className="nama-info">
-                                <span className="nama-text">{pegawai.nama_pegawai}</span>
-                                {status && (
-                                  <span
-                                    className="nama-status-badge"
-                                    style={{ background: keteranganColors[status] }}
-                                  >
-                                    {status}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="td-nip">{pegawai.nip}</td>
-                          <td className="td-jabatan">{pegawai.jabatan || "-"}</td>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {list.map((pegawai, index) => {
+                          const status = getAbsenStatus(pegawai.id);
 
-                          {keteranganOptions.map((ket) => {
-                            const isChecked = status === ket;
-
-                            return (
-                              <td key={ket} className="td-checkbox">
-                                <label className="checkbox-wrapper">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => handleCheckAbsen(pegawai.id, ket)}
-                                    className="hidden-checkbox"
-                                  />
+                          return (
+                            <tr key={pegawai.id} className="absen-row">
+                              <td className="td-no">{index + 1}</td>
+                              <td className="td-nama">
+                                <div className="nama-cell">
                                   <div
-                                    className={`custom-checkbox ${isChecked ? "checked" : ""}`}
-                                    style={
-                                      isChecked
-                                        ? {
-                                            background: keteranganColors[ket],
-                                            borderColor: keteranganColors[ket],
-                                          }
-                                        : {}
-                                    }
+                                    className="avatar"
+                                    style={{ background: cfg.gradient }}
                                   >
-                                    {isChecked && (
-                                      <Check size={14} color="white" strokeWidth={3} />
+                                    {pegawai.nama_pegawai.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="nama-info">
+                                    <span className="nama-text">{pegawai.nama_pegawai}</span>
+                                    {status && (
+                                      <span
+                                        className="nama-status-badge"
+                                        style={{ background: keteranganColors[status] }}
+                                      >
+                                        {status}
+                                      </span>
                                     )}
                                   </div>
-                                </label>
+                                </div>
                               </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+                              <td className="td-nip">{pegawai.nip}</td>
+                              <td className="td-jabatan">{pegawai.jabatan || "-"}</td>
 
-      {absenPegawaiList.length === 0 && selectedKegiatanId !== null && (
+                              {keteranganOptions.map((ket) => {
+                                const isChecked = status === ket;
+
+                                return (
+                                  <td key={ket} className="td-checkbox">
+                                    <label className="checkbox-wrapper">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => handleCheckAbsen(pegawai.id, ket)}
+                                        className="hidden-checkbox"
+                                      />
+                                      <div
+                                        className={`custom-checkbox ${isChecked ? "checked" : ""}`}
+                                        style={
+                                          isChecked
+                                            ? {
+                                                background: keteranganColors[ket],
+                                                borderColor: keteranganColors[ket],
+                                              }
+                                            : {}
+                                        }
+                                      >
+                                        {isChecked && (
+                                          <Check size={14} color="white" strokeWidth={3} />
+                                        )}
+                                      </div>
+                                    </label>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* ABSEN KEGIATAN (Kolom Dinamis - Input Bebas) */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {selectedKegiatanId !== null && kolomAbsenList.length > 0 && (
+        <div className="glass">
+          <div className="table-wrapper">
+            <table className="absen-table">
+              <thead>
+                <tr>
+                  <th className="th-no">No</th>
+                  <th className="th-nama-pegawai">Nama Pegawai</th>
+                  {kolomAbsenList.map((kolom) => (
+                    <th key={kolom.id} className="th-kolom-absen">
+                      <div className="th-kolom-content">
+                        <div className="th-kategori">{kolom.nama_kategori}</div>
+                        {kolom.metode && <div className="th-metode">{kolom.metode}</div>}
+                        {kolom.satuan && <div className="th-satuan">{kolom.satuan}</div>}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPegawai
+                  .sort((a, b) => (a.urutan ?? 999) - (b.urutan ?? 999))
+                  .map((pegawai, index) => {
+                    const cfg = clusterConfig[pegawai.cluster];
+                    
+                    return (
+                      <tr key={pegawai.id}>
+                        <td className="td-no">{index + 1}</td>
+                        <td className="pegawai-name-cell">
+                          <div className="nama-cell">
+                            <div
+                              className="avatar"
+                              style={{ background: cfg.gradient }}
+                            >
+                              {pegawai.nama_pegawai.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="nama-text">{pegawai.nama_pegawai}</span>
+                          </div>
+                        </td>
+                        {kolomAbsenList.map((kolom) => {
+                          const nilai = getNilaiAbsensi(pegawai.id, kolom.id);
+
+                          return (
+                            <td key={kolom.id} className="absen-cell">
+                              <input
+                                type="text"
+                                value={nilai}
+                                onChange={(e) =>
+                                  updateNilaiAbsensi(pegawai.id, kolom.id, e.target.value)
+                                }
+                                className="absen-input"
+                                placeholder="-"
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty State untuk Kegiatan Tanpa Kolom ── */}
+      {selectedKegiatanId !== null && kolomAbsenList.length === 0 && (
+        <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
+          <TableIcon size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
+          <p style={{ color: "#64748b", fontSize: 16, marginBottom: 8 }}>
+            Belum ada kolom absensi untuk kegiatan ini.
+          </p>
+          <p style={{ color: "#94a3b8", fontSize: 14 }}>
+            Silakan buat kolom absensi di halaman <strong>Kelola Kegiatan</strong> terlebih dahulu.
+          </p>
+        </div>
+      )}
+
+      {/* ── Empty State untuk Kegiatan Tanpa Pegawai ── */}
+      {selectedKegiatanId !== null && absenPegawaiList.length === 0 && (
         <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
           <FolderOpen size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
           <p style={{ color: "#64748b", fontSize: 16 }}>
@@ -642,6 +889,9 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* MODAL EXPORT */}
+      {/* ══════════════════════════════════════════════════════════════ */}
       {showExportModal && (
         <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
           <div

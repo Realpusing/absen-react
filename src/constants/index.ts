@@ -1,32 +1,16 @@
 import { Shield, Briefcase, Wrench, Radio } from "lucide-react";
 import type { ClusterType, KeteranganAbsen } from "../types";
 
+// ══════════════════════════════════════════════════════════════
+// CLUSTER OPTIONS
+// ══════════════════════════════════════════════════════════════
+
 export const clusterOptions: ClusterType[] = [
   "Pimpinan",
   "Umum",
   "Sumber Daya",
   "Operasi",
 ];
-
-export const keteranganOptions: KeteranganAbsen[] = [
-  "Hadir",
-  "Dinas Dalam",
-  "Dinas Luar",
-  "Cuti",
-  "Izin",
-  "Sakit",
-  "Alpha",
-];
-
-export const keteranganColors: Record<KeteranganAbsen, string> = {
-  Hadir: "#10b981",
-  "Dinas Dalam": "#3b82f6",
-  "Dinas Luar": "#6366f1",
-  Cuti: "#f59e0b",
-  Izin: "#eab308",
-  Sakit: "#a855f7",
-  Alpha: "#ef4444",
-};
 
 export const clusterConfig: Record<
   ClusterType,
@@ -58,25 +42,69 @@ export const clusterConfig: Record<
   },
 };
 
-export const initialPegawaiForm = {
-    nama_pegawai: "",
-    nip: "",
-    nik: "",
-    jabatan: "",
-    golongan_pangkat: "",
-    jenjang_jabatan: "",
-    nama_pimpinan_langsung: "",
-    nik_pimpinan_langsung: "",
-    nip_pimpinan_langsung: "",
-    cluster: "Umum" as ClusterType,
-    urutan: 0,
-  };
+// ══════════════════════════════════════════════════════════════
+// KETERANGAN ABSEN OPTIONS
+// ══════════════════════════════════════════════════════════════
 
-  export const initialKegiatanForm = {
-    nama_kegiatan: "",
-    deskripsi: "",
-    tanggal_pelaksanaan: "",
-    instruktur_id: "",   // string karena dari select value
-    asisten_id: "",
-    materi: "",
-  };
+export const keteranganOptions: KeteranganAbsen[] = [
+  "Hadir",
+  "Dinas Dalam",
+  "Dinas Luar",
+  "Cuti",
+  "Izin",
+  "Sakit",
+  "Alpha",
+];
+
+export const keteranganColors: Record<KeteranganAbsen, string> = {
+  Hadir: "#10b981",
+  "Dinas Dalam": "#3b82f6",
+  "Dinas Luar": "#6366f1",
+  Cuti: "#f59e0b",
+  Izin: "#eab308",
+  Sakit: "#a855f7",
+  Alpha: "#ef4444",
+};
+
+// ══════════════════════════════════════════════════════════════
+// FORM INITIAL VALUES
+// ══════════════════════════════════════════════════════════════
+
+export const initialPegawaiForm = {
+  nama_pegawai: "",
+  nip: "",
+  nik: "",
+  jabatan: "",
+  golongan_pangkat: "",
+  jenjang_jabatan: "",
+  nama_pimpinan_langsung: "",
+  nik_pimpinan_langsung: "",
+  nip_pimpinan_langsung: "",
+  cluster: "Umum" as ClusterType,
+  urutan: 0,
+};
+
+export const initialKegiatanForm = {
+  nama_kegiatan: "",
+  deskripsi: "",
+  tanggal_pelaksanaan: "",
+  instruktur_id: "",
+  asisten_id: "",
+  materi: "",
+};
+
+// ══════════════════════════════════════════════════════════════
+// STATUS ABSENSI OPTIONS (untuk modal absensi kegiatan)
+// ══════════════════════════════════════════════════════════════
+
+export const statusAbsensiOptions = [
+  { value: "", label: "-" },
+  { value: "✅ Hadir", label: "Hadir" },
+  { value: "❌ Tidak Hadir", label: "Tidak Hadir" },
+  { value: "🏥 Sakit", label: "Sakit" },
+  { value: "📝 Izin", label: "Izin" },
+  { value: "🔴 Alpha", label: "Alpha" },
+  { value: "💪 Fit", label: "Fit" },
+  { value: "😓 Kurang Fit", label: "Kurang Fit" },
+  { value: "🤕 Tidak Fit", label: "Tidak Fit" },
+];

@@ -1,6 +1,6 @@
 import { Calendar, ClipboardList, Users, Menu, X } from "lucide-react";
 import type { Pegawai } from "../types";
-import { clusterOptions, clusterConfig } from "../constants";
+import { clusterConfig, clusterOptions } from "../constants";
 
 interface SidebarProps {
   activeMenu: "absen" | "pegawai" | "kegiatan";
