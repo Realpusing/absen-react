@@ -11,7 +11,17 @@ export type KeteranganAbsen =
   | "Cuti"
   | "Izin"
   | "Sakit"
+  | "Lepas Piket"
   | "Alpha";
+
+// ══════════════════════════════════════════════════════════════
+// METODE PENILAIAN (untuk kolom dinamis)
+// ══════════════════════════════════════════════════════════════
+
+export interface MetodePenilaian {
+  nama: string;   // "Push Up", "Lari 2.4 KM", "Pull Up"
+  satuan: string; // "rep/menit", "meter", "detik"
+}
 
 // ══════════════════════════════════════════════════════════════
 // PEGAWAI
@@ -34,7 +44,7 @@ export interface Pegawai {
 }
 
 // ══════════════════════════════════════════════════════════════
-// ABSEN (untuk absen harian)
+// ABSEN HARIAN (Tabel: absen)
 // ══════════════════════════════════════════════════════════════
 
 export interface Absen {
@@ -57,32 +67,88 @@ export interface Kegiatan {
   tanggal_pelaksanaan?: string | null;
   instruktur_id?: number | null;
   asisten_id?: number | null;
+  pejabat_id?: number | null;
   materi?: string | null;
   created_at?: string;
 }
 
 // ══════════════════════════════════════════════════════════════
-// KOLOM ABSEN (Dynamic Columns untuk Kegiatan)
+// KEGIATAN PEGAWAI (Many-to-Many)
 // ══════════════════════════════════════════════════════════════
 
-// ... types sebelumnya ...
+export interface KegiatanPegawai {
+  id: number;
+  kegiatan_id: number;
+  pegawai_id: number;
+  created_at?: string;
+}
+
+// ══════════════════════════════════════════════════════════════
+// KOLOM ABSEN - Kolom Dinamis dengan Banyak Metode (Tabel: kolom_absen)
+// ══════════════════════════════════════════════════════════════
 
 export interface KolomAbsen {
   id: number;
   kegiatan_id: number;
-  nama_kategori: string;
-  metode?: string | null;
-  satuan?: string | null;
+  nama_kategori: string;           // "Kebugaran Fisik", "Tes Psikologi"
+  metode_list: MetodePenilaian[];  // Array: [{ nama: "Push Up", satuan: "rep/menit" }, ...]
   urutan: number;
   created_at?: string;
 }
+
+// ══════════════════════════════════════════════════════════════
+// ABSENSI - Data Input Nilai Bebas (Tabel: absensi)
+// ══════════════════════════════════════════════════════════════
 
 export interface Absensi {
   id: number;
   kegiatan_id: number;
   pegawai_id: number;
   kolom_absen_id: number;
-  nilai: string; // nilai bebas
+  nama_metode: string;  // "Push Up", "Lari 2.4 KM", dll
+  nilai: string;        // Input bebas: "1400", "45", "A", dll
+  tanggal: string;
+  keterangan?: string | null;
+  created_at?: string;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ABSENSI KETERANGAN - Kolom ABSEN di Ujung Kanan (Tabel: absensi_keterangan)
+// ══════════════════════════════════════════════════════════════
+
+export interface AbsensiKeterangan {
+  id: number;
+  kegiatan_id: number;
+  pegawai_id: number;
+  keterangan: KeteranganAbsen; // Hadir, Alpha, Dinas Luar, Lepas Piket, dll
   tanggal: string;
   created_at?: string;
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORM TYPES
+// ══════════════════════════════════════════════════════════════
+
+export interface PegawaiFormData {
+  nama_pegawai: string;
+  nip: string;
+  nik: string;
+  jabatan: string;
+  golongan_pangkat: string;
+  jenjang_jabatan: string;
+  nama_pimpinan_langsung: string;
+  nik_pimpinan_langsung: string;
+  nip_pimpinan_langsung: string;
+  cluster: ClusterType;
+  urutan: number;
+}
+
+export interface KegiatanFormData {
+  nama_kegiatan: string;
+  deskripsi: string;
+  tanggal_pelaksanaan: string;
+  instruktur_id: string;
+  asisten_id: string;
+  pejabat_id: string;
+  materi: string;
 }

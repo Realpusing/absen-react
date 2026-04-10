@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ClipboardList,
   FolderOpen,
@@ -12,12 +12,30 @@ import {
   BookOpen,
   Calendar,
   ListChecks,
-  Table,
+  Shield,
   Save,
+  Layers,
 } from "lucide-react";
 import { supabase } from "../supabase";
-import { initialKegiatanForm, clusterOptions, clusterConfig } from "../constants";
-import type { Pegawai, Kegiatan, KolomAbsen, Absensi } from "../types";
+import {
+  initialKegiatanForm,
+  clusterOptions,
+  clusterConfig,
+  keteranganOptions,
+  keteranganColors,
+} from "../constants";
+import type {
+  Pegawai,
+  Kegiatan,
+  KolomAbsen,
+  Absensi,
+  KeteranganAbsen,
+  AbsensiKeterangan,
+} from "../types";
+
+// ══════════════════════════════════════════════════════════════
+// TYPES LOKAL
+// ══════════════════════════════════════════════════════════════
 
 interface KegiatanPegawaiRow {
   id: number;
@@ -25,37 +43,66 @@ interface KegiatanPegawaiRow {
   pegawai_id: number;
 }
 
+interface KegiatanExtended extends Kegiatan {
+  pejabat_id?: number | null;
+  keterangan_columns?: KeteranganAbsen[] | null;
+}
+
 interface Props {
   pegawaiList: Pegawai[];
   refreshPegawai: () => Promise<void>;
 }
 
+// ══════════════════════════════════════════════════════════════
+// KOMPONEN UTAMA
+// ══════════════════════════════════════════════════════════════
+
 export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
-  // ══════════════════════════════════════════════════════════════
-  // STATE
-  // ══════════════════════════════════════════════════════════════
-  
-  const [kegiatanList, setKegiatanList] = useState<Kegiatan[]>([]);
-  const [kegiatanForm, setKegiatanForm] = useState(initialKegiatanForm);
+
+  // ── STATE: KEGIATAN ──────────────────────────────────────────
+  const [kegiatanList, setKegiatanList] = useState<KegiatanExtended[]>([]);
   const [editKegiatanId, setEditKegiatanId] = useState<number | null>(null);
+
+  // form kegiatan
+  const [formNamaKegiatan, setFormNamaKegiatan] = useState("");
+  const [formDeskripsi, setFormDeskripsi] = useState("");
+  const [formTanggal, setFormTanggal] = useState("");
+  const [formInstrukturId, setFormInstrukturId] = useState("");
+  const [formAsistenId, setFormAsistenId] = useState("");
+  const [formPejabatId, setFormPejabatId] = useState("");
+  const [formMateri, setFormMateri] = useState("");
+
+  // ── STATE: KEGIATAN PEGAWAI ──────────────────────────────────
   const [kegiatanPegawaiRows, setKegiatanPegawaiRows] = useState<KegiatanPegawaiRow[]>([]);
-  
-  // Modal states
+
+  // ── STATE: MODAL ASSIGN PEGAWAI ──────────────────────────────
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignKegiatanId, setAssignKegiatanId] = useState<number | null>(null);
-  
-  // Absensi states
-  const [showAbsenModal, setShowAbsenModal] = useState(false);
-  const [absenKegiatanId, setAbsenKegiatanId] = useState<number | null>(null);
+
+  // ── STATE: MODAL KELOLA PENILAIAN ────────────────────────────
+  const [showKelolaModal, setShowKelolaModal] = useState(false);
+  const [kelolaKegiatan, setKelolaKegiatan] = useState<KegiatanExtended | null>(null);
+
+  // data kolom penilaian (free text)
   const [kolomAbsenList, setKolomAbsenList] = useState<KolomAbsen[]>([]);
-  const [absensiData, setAbsensiData] = useState<Absensi[]>([]);
-  
-  // Form kolom absen
-  const [newKolomForm, setNewKolomForm] = useState({
-    nama_kategori: "",
-    metode: "",
-    satuan: "",
-  });
+  // data nilai penilaian
+  const [absensiList, setAbsensiList] = useState<Absensi[]>([]);
+  // data keterangan absen (kolom kanan)
+  const [absensiKeteranganList, setAbsensiKeteranganList] = useState<AbsensiKeterangan[]>([]);
+
+  // kolom ABSEN kanan yang dipilih admin
+  const [keteranganColumns, setKeteranganColumns] = useState<KeteranganAbsen[]>([]);
+
+  // form tambah metode
+  const [formKategori, setFormKategori] = useState("");
+  const [formMetode, setFormMetode] = useState("");
+  const [formSatuan, setFormSatuan] = useState("");
+
+  // draft nilai input (save onBlur, bukan onChange)
+  const [draftNilai, setDraftNilai] = useState<Record<string, string>>({});
+
+  // tanggal hari ini
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   // ══════════════════════════════════════════════════════════════
   // FETCH FUNCTIONS
@@ -68,10 +115,10 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Gagal mengambil kegiatan:", error.message);
+      console.error("fetchKegiatan error:", error.message);
       return;
     }
-    setKegiatanList((data as Kegiatan[]) || []);
+    setKegiatanList((data as KegiatanExtended[]) || []);
   };
 
   const fetchKegiatanPegawai = async () => {
@@ -80,7 +127,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
       .select("*");
 
     if (error) {
-      console.error("Gagal mengambil kegiatan_pegawai:", error.message);
+      console.error("fetchKegiatanPegawai error:", error.message);
       return;
     }
     setKegiatanPegawaiRows((data as KegiatanPegawaiRow[]) || []);
@@ -94,44 +141,64 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
       .order("urutan", { ascending: true });
 
     if (error) {
-      console.error("Gagal mengambil kolom absen:", error.message);
+      console.error("fetchKolomAbsen error:", error.message);
       return;
     }
     setKolomAbsenList((data as KolomAbsen[]) || []);
   };
 
-  const fetchAbsensi = async (kegiatanId: number) => {
+  const fetchAbsensi = async (kegiatanId: number, tanggal: string) => {
     const { data, error } = await supabase
       .from("absensi")
       .select("*")
-      .eq("kegiatan_id", kegiatanId);
+      .eq("kegiatan_id", kegiatanId)
+      .eq("tanggal", tanggal);
 
     if (error) {
-      console.error("Gagal mengambil absensi:", error.message);
+      console.error("fetchAbsensi error:", error.message);
       return;
     }
-    setAbsensiData((data as Absensi[]) || []);
+    setAbsensiList((data as Absensi[]) || []);
+  };
+
+  const fetchAbsensiKeterangan = async (kegiatanId: number, tanggal: string) => {
+    const { data, error } = await supabase
+      .from("absensi_keterangan")
+      .select("*")
+      .eq("kegiatan_id", kegiatanId)
+      .eq("tanggal", tanggal);
+
+    if (error) {
+      console.error("fetchAbsensiKeterangan error:", error.message);
+      return;
+    }
+    setAbsensiKeteranganList((data as AbsensiKeterangan[]) || []);
   };
 
   useEffect(() => {
     refreshPegawai();
     fetchKegiatan();
     fetchKegiatanPegawai();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ══════════════════════════════════════════════════════════════
-  // HELPER FUNCTIONS
+  // HELPER
   // ══════════════════════════════════════════════════════════════
 
-  const getNamaPegawai = (id?: number) => {
+  const sortedPegawai = useMemo(
+    () => [...pegawaiList].sort((a, b) => a.nama_pegawai.localeCompare(b.nama_pegawai, "id")),
+    [pegawaiList]
+  );
+
+  const getNamaPegawai = (id?: number | null) => {
     if (!id) return "-";
     return pegawaiList.find((p) => p.id === id)?.nama_pegawai ?? "-";
   };
 
   const formatTanggal = (dateStr: string) => {
-    const [year, month, day] = dateStr.split("-").map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString("id-ID", {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("id-ID", {
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -139,36 +206,57 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
     });
   };
 
-  const sortedPegawai = [...pegawaiList].sort((a, b) =>
-    a.nama_pegawai.localeCompare(b.nama_pegawai, "id")
+  // group kolom_absen by nama_kategori
+  const groupedKolom = useMemo(() => {
+    const map = new Map<string, KolomAbsen[]>();
+    for (const k of kolomAbsenList) {
+      if (!map.has(k.nama_kategori)) map.set(k.nama_kategori, []);
+      map.get(k.nama_kategori)!.push(k);
+    }
+    return map;
+  }, [kolomAbsenList]);
+
+  // semua metode dalam urutan tampil
+  const allMetode = useMemo(
+    () => [...groupedKolom.values()].flat(),
+    [groupedKolom]
   );
 
   // ══════════════════════════════════════════════════════════════
-  // KEGIATAN CRUD
+  // RESET FORM KEGIATAN
   // ══════════════════════════════════════════════════════════════
 
-  const handleKegiatanChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setKegiatanForm((prev) => ({ ...prev, [name]: value }));
+  const resetFormKegiatan = () => {
+    setFormNamaKegiatan("");
+    setFormDeskripsi("");
+    setFormTanggal("");
+    setFormInstrukturId("");
+    setFormAsistenId("");
+    setFormPejabatId("");
+    setFormMateri("");
+    setEditKegiatanId(null);
   };
+
+  // ══════════════════════════════════════════════════════════════
+  // CRUD KEGIATAN
+  // ══════════════════════════════════════════════════════════════
 
   const submitKegiatan = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!kegiatanForm.nama_kegiatan) {
+    if (!formNamaKegiatan.trim()) {
       alert("Nama kegiatan wajib diisi");
       return;
     }
 
     const payload = {
-      nama_kegiatan: kegiatanForm.nama_kegiatan,
-      deskripsi: kegiatanForm.deskripsi || null,
-      tanggal_pelaksanaan: kegiatanForm.tanggal_pelaksanaan || null,
-      instruktur_id: kegiatanForm.instruktur_id ? Number(kegiatanForm.instruktur_id) : null,
-      asisten_id: kegiatanForm.asisten_id ? Number(kegiatanForm.asisten_id) : null,
-      materi: kegiatanForm.materi || null,
+      nama_kegiatan: formNamaKegiatan.trim(),
+      deskripsi: formDeskripsi.trim() || null,
+      tanggal_pelaksanaan: formTanggal || null,
+      instruktur_id: formInstrukturId ? Number(formInstrukturId) : null,
+      asisten_id: formAsistenId ? Number(formAsistenId) : null,
+      pejabat_id: formPejabatId ? Number(formPejabatId) : null,
+      materi: formMateri.trim() || null,
     };
 
     if (editKegiatanId) {
@@ -176,50 +264,48 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
         .from("kegiatan")
         .update(payload)
         .eq("id", editKegiatanId);
+
       if (error) {
         alert("Gagal update: " + error.message);
         return;
       }
     } else {
       const { error } = await supabase.from("kegiatan").insert([payload]);
+
       if (error) {
         alert("Gagal tambah: " + error.message);
         return;
       }
     }
 
-    setKegiatanForm(initialKegiatanForm);
-    setEditKegiatanId(null);
+    resetFormKegiatan();
     fetchKegiatan();
   };
 
-  const editKegiatan = (item: Kegiatan) => {
-    setKegiatanForm({
-      nama_kegiatan: item.nama_kegiatan,
-      deskripsi: item.deskripsi || "",
-      tanggal_pelaksanaan: item.tanggal_pelaksanaan || "",
-      instruktur_id: item.instruktur_id ? String(item.instruktur_id) : "",
-      asisten_id: item.asisten_id ? String(item.asisten_id) : "",
-      materi: item.materi || "",
-    });
+  const handleEditKegiatan = (item: KegiatanExtended) => {
+    setFormNamaKegiatan(item.nama_kegiatan);
+    setFormDeskripsi(item.deskripsi || "");
+    setFormTanggal(item.tanggal_pelaksanaan || "");
+    setFormInstrukturId(item.instruktur_id ? String(item.instruktur_id) : "");
+    setFormAsistenId(item.asisten_id ? String(item.asisten_id) : "");
+    setFormPejabatId(item.pejabat_id ? String(item.pejabat_id) : "");
+    setFormMateri(item.materi || "");
     setEditKegiatanId(item.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const deleteKegiatan = async (id: number) => {
+  const handleDeleteKegiatan = async (id: number) => {
     if (!window.confirm("Yakin hapus kegiatan ini?")) return;
+
     const { error } = await supabase.from("kegiatan").delete().eq("id", id);
+
     if (error) {
       alert("Gagal hapus: " + error.message);
       return;
     }
+
     fetchKegiatan();
     fetchKegiatanPegawai();
-  };
-
-  const cancelEdit = () => {
-    setKegiatanForm(initialKegiatanForm);
-    setEditKegiatanId(null);
   };
 
   // ══════════════════════════════════════════════════════════════
@@ -228,176 +314,283 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
   const isAssigned = (kegiatanId: number, pegawaiId: number) =>
     kegiatanPegawaiRows.some(
-      (row) => row.kegiatan_id === kegiatanId && row.pegawai_id === pegawaiId
+      (r) => r.kegiatan_id === kegiatanId && r.pegawai_id === pegawaiId
     );
 
   const getAssignedPegawai = (kegiatanId: number) => {
     const ids = kegiatanPegawaiRows
-      .filter((row) => row.kegiatan_id === kegiatanId)
-      .map((row) => row.pegawai_id);
+      .filter((r) => r.kegiatan_id === kegiatanId)
+      .map((r) => r.pegawai_id);
     return pegawaiList.filter((p) => ids.includes(p.id));
   };
 
   const getAssignedIds = (kegiatanId: number) =>
     kegiatanPegawaiRows
-      .filter((row) => row.kegiatan_id === kegiatanId)
-      .map((row) => row.pegawai_id);
+      .filter((r) => r.kegiatan_id === kegiatanId)
+      .map((r) => r.pegawai_id);
 
   const togglePegawai = async (kegiatanId: number, pegawaiId: number) => {
     const existing = kegiatanPegawaiRows.find(
-      (row) => row.kegiatan_id === kegiatanId && row.pegawai_id === pegawaiId
+      (r) => r.kegiatan_id === kegiatanId && r.pegawai_id === pegawaiId
     );
+
     if (existing) {
       const { error } = await supabase
         .from("kegiatan_pegawai")
         .delete()
         .eq("id", existing.id);
-      if (error) {
-        alert("Gagal hapus: " + error.message);
-        return;
-      }
+      if (error) { alert("Gagal hapus: " + error.message); return; }
     } else {
       const { error } = await supabase
         .from("kegiatan_pegawai")
         .insert([{ kegiatan_id: kegiatanId, pegawai_id: pegawaiId }]);
-      if (error) {
-        alert("Gagal tambah: " + error.message);
-        return;
-      }
+      if (error) { alert("Gagal tambah: " + error.message); return; }
     }
+
     fetchKegiatanPegawai();
   };
 
-  const selectAll = async (kegiatanId: number) => {
+  const selectAllPegawai = async (kegiatanId: number) => {
     const assignedIds = getAssignedIds(kegiatanId);
     const payload = pegawaiList
       .filter((p) => !assignedIds.includes(p.id))
       .map((p) => ({ kegiatan_id: kegiatanId, pegawai_id: p.id }));
+
     if (payload.length === 0) return;
+
     const { error } = await supabase.from("kegiatan_pegawai").insert(payload);
-    if (error) {
-      alert("Gagal pilih semua: " + error.message);
-      return;
-    }
+    if (error) { alert("Gagal pilih semua: " + error.message); return; }
+
     fetchKegiatanPegawai();
   };
 
-  const deselectAll = async (kegiatanId: number) => {
+  const deselectAllPegawai = async (kegiatanId: number) => {
     const { error } = await supabase
       .from("kegiatan_pegawai")
       .delete()
       .eq("kegiatan_id", kegiatanId);
-    if (error) {
-      alert("Gagal hapus semua: " + error.message);
-      return;
-    }
+
+    if (error) { alert("Gagal hapus semua: " + error.message); return; }
+
     fetchKegiatanPegawai();
   };
 
   // ══════════════════════════════════════════════════════════════
-  // KOLOM ABSEN MANAGEMENT
+  // BUKA/TUTUP MODAL KELOLA
   // ══════════════════════════════════════════════════════════════
 
-  const addKolomAbsen = async () => {
-    if (!absenKegiatanId || !newKolomForm.nama_kategori.trim()) {
-      alert("Nama kategori wajib diisi");
+  const openKelola = async (item: KegiatanExtended) => {
+    setKelolaKegiatan(item);
+    setKeteranganColumns(item.keterangan_columns ?? []);
+    setDraftNilai({});
+    setFormKategori("");
+    setFormMetode("");
+    setFormSatuan("");
+
+    await fetchKolomAbsen(item.id);
+    await fetchAbsensi(item.id, today);
+    await fetchAbsensiKeterangan(item.id, today);
+
+    setShowKelolaModal(true);
+  };
+
+  const closeKelola = () => {
+    setShowKelolaModal(false);
+    setKelolaKegiatan(null);
+    setKolomAbsenList([]);
+    setAbsensiList([]);
+    setAbsensiKeteranganList([]);
+    setKeteranganColumns([]);
+    setDraftNilai({});
+    setFormKategori("");
+    setFormMetode("");
+    setFormSatuan("");
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // KOLOM PENILAIAN (kolom_absen)
+  // ══════════════════════════════════════════════════════════════
+
+  const addMetodePenilaian = async () => {
+    if (!kelolaKegiatan) return;
+
+    if (!formKategori.trim()) {
+      alert("Nama kategori wajib diisi (contoh: Kebugaran Fisik)");
+      return;
+    }
+    if (!formMetode.trim()) {
+      alert("Nama metode wajib diisi (contoh: Push Up / Lari / Pull Up)");
       return;
     }
 
     const urutan = kolomAbsenList.length;
+
     const { error } = await supabase.from("kolom_absen").insert([
       {
-        kegiatan_id: absenKegiatanId,
-        nama_kategori: newKolomForm.nama_kategori.trim(),
-        metode: newKolomForm.metode.trim() || null,
-        satuan: newKolomForm.satuan.trim() || null,
+        kegiatan_id: kelolaKegiatan.id,
+        nama_kategori: formKategori.trim(),
+        metode: formMetode.trim(),
+        satuan: formSatuan.trim() || null,
         urutan,
       },
     ]);
 
     if (error) {
-      alert("Gagal tambah kolom: " + error.message);
+      alert("Gagal tambah metode: " + error.message);
       return;
     }
 
-    setNewKolomForm({ nama_kategori: "", metode: "", satuan: "" });
-    fetchKolomAbsen(absenKegiatanId);
+    setFormMetode("");
+    setFormSatuan("");
+    // biarkan formKategori tetap agar user bisa tambah metode lain di kategori sama
+    fetchKolomAbsen(kelolaKegiatan.id);
   };
 
-  const deleteKolomAbsen = async (kolomId: number) => {
-    if (!window.confirm("Hapus kolom ini? Data absensi di kolom ini akan terhapus."))
-      return;
+  const deleteMetodePenilaian = async (kolomId: number) => {
+    if (!kelolaKegiatan) return;
+    if (!window.confirm("Hapus metode ini? Data nilainya juga akan terhapus.")) return;
 
     const { error } = await supabase.from("kolom_absen").delete().eq("id", kolomId);
+    if (error) { alert("Gagal hapus metode: " + error.message); return; }
 
-    if (error) {
-      alert("Gagal hapus kolom: " + error.message);
-      return;
-    }
-
-    if (absenKegiatanId) {
-      fetchKolomAbsen(absenKegiatanId);
-      fetchAbsensi(absenKegiatanId);
-    }
+    await fetchKolomAbsen(kelolaKegiatan.id);
+    await fetchAbsensi(kelolaKegiatan.id, today);
   };
 
   // ══════════════════════════════════════════════════════════════
-  // ABSENSI MANAGEMENT
+  // KOLOM ABSEN KANAN (keterangan_columns di tabel kegiatan)
   // ══════════════════════════════════════════════════════════════
 
-  const getAbsensiStatus = (pegawaiId: number, kolomId: number) => {
-    return absensiData.find(
-      (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
+  const toggleKeteranganColumn = (ket: KeteranganAbsen) => {
+    setKeteranganColumns((prev) =>
+      prev.includes(ket) ? prev.filter((x) => x !== ket) : [...prev, ket]
     );
   };
 
-  const updateAbsensi = async (
-    pegawaiId: number,
-    kolomId: number,
-    nilai: string
-  ) => {
-    if (!absenKegiatanId) return;
+  const saveKeteranganColumns = async () => {
+    if (!kelolaKegiatan) return;
 
-    const existing = getAbsensiStatus(pegawaiId, kolomId);
-    const today = new Date().toISOString().split("T")[0];
+    const { error } = await supabase
+      .from("kegiatan")
+      .update({ keterangan_columns: keteranganColumns } as any)
+      .eq("id", kelolaKegiatan.id);
 
-    if (existing) {
-      // Update
-      const { error } = await supabase
-        .from("absensi")
-        .update({ nilai })
-        .eq("id", existing.id);
-
-      if (error) {
-        console.error("Gagal update absensi:", error.message);
-        return;
-      }
-    } else {
-      // Insert
-      const { error } = await supabase.from("absensi").insert([
-        {
-          kegiatan_id: absenKegiatanId,
-          pegawai_id: pegawaiId,
-          kolom_absen_id: kolomId,
-          nilai,
-          tanggal: today,
-        },
-      ]);
-
-      if (error) {
-        console.error("Gagal insert absensi:", error.message);
-        return;
-      }
+    if (error) {
+      alert("Gagal simpan kolom ABSEN: " + error.message);
+      return;
     }
 
-    fetchAbsensi(absenKegiatanId);
+    // update list local juga
+    setKegiatanList((prev) =>
+      prev.map((k) =>
+        k.id === kelolaKegiatan.id
+          ? { ...k, keterangan_columns: keteranganColumns }
+          : k
+      )
+    );
+
+    alert("✅ Kolom ABSEN berhasil disimpan!");
   };
 
-  const openAbsenModal = (kegiatanId: number) => {
-    setAbsenKegiatanId(kegiatanId);
-    fetchKolomAbsen(kegiatanId);
-    fetchAbsensi(kegiatanId);
-    setShowAbsenModal(true);
+  // ══════════════════════════════════════════════════════════════
+  // NILAI FREE TEXT (absensi) — save onBlur
+  // ══════════════════════════════════════════════════════════════
+
+  const cellKey = (pegawaiId: number, kolomId: number) => `${pegawaiId}_${kolomId}`;
+
+  const getNilaiCell = (pegawaiId: number, kolomId: number) => {
+    const key = cellKey(pegawaiId, kolomId);
+    if (key in draftNilai) return draftNilai[key];
+    return absensiList.find(
+      (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
+    )?.nilai ?? "";
+  };
+
+  const saveNilaiCell = async (pegawaiId: number, kolomId: number) => {
+    if (!kelolaKegiatan) return;
+
+    const key = cellKey(pegawaiId, kolomId);
+    const nilai = (draftNilai[key] ?? "").trim();
+
+    const existing = absensiList.find(
+      (a) =>
+        a.pegawai_id === pegawaiId &&
+        a.kolom_absen_id === kolomId &&
+        a.tanggal === today
+    );
+
+    if (!nilai) {
+      // hapus jika ada
+      if (existing) {
+        const { error } = await supabase.from("absensi").delete().eq("id", existing.id);
+        if (error) { console.error("Gagal hapus nilai:", error.message); return; }
+        await fetchAbsensi(kelolaKegiatan.id, today);
+      }
+      return;
+    }
+
+    const { error } = await supabase.from("absensi").upsert(
+      [{
+        kegiatan_id: kelolaKegiatan.id,
+        pegawai_id: pegawaiId,
+        kolom_absen_id: kolomId,
+        nilai,
+        tanggal: today,
+      }],
+      { onConflict: "kegiatan_id,pegawai_id,kolom_absen_id,tanggal" }
+    );
+
+    if (error) { console.error("Gagal simpan nilai:", error.message); return; }
+
+    await fetchAbsensi(kelolaKegiatan.id, today);
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // ABSEN KANAN (absensi_keterangan) — 1 pilihan per pegawai
+  // ══════════════════════════════════════════════════════════════
+
+  const getKeteranganPegawai = (pegawaiId: number): KeteranganAbsen | null => {
+    const row = absensiKeteranganList.find(
+      (a) => a.pegawai_id === pegawaiId && a.tanggal === today
+    );
+    return (row?.keterangan as KeteranganAbsen) ?? null;
+  };
+
+  const setKeteranganPegawai = async (
+    pegawaiId: number,
+    ket: KeteranganAbsen | null
+  ) => {
+    if (!kelolaKegiatan) return;
+
+    const existing = absensiKeteranganList.find(
+      (a) => a.pegawai_id === pegawaiId && a.tanggal === today
+    );
+
+    if (!ket) {
+      if (existing) {
+        const { error } = await supabase
+          .from("absensi_keterangan")
+          .delete()
+          .eq("id", existing.id);
+        if (error) { console.error("Gagal hapus keterangan:", error.message); return; }
+      }
+      await fetchAbsensiKeterangan(kelolaKegiatan.id, today);
+      return;
+    }
+
+    const { error } = await supabase.from("absensi_keterangan").upsert(
+      [{
+        kegiatan_id: kelolaKegiatan.id,
+        pegawai_id: pegawaiId,
+        tanggal: today,
+        keterangan: ket,
+      }],
+      { onConflict: "kegiatan_id,pegawai_id,tanggal" }
+    );
+
+    if (error) { console.error("Gagal simpan keterangan:", error.message); return; }
+
+    await fetchAbsensiKeterangan(kelolaKegiatan.id, today);
   };
 
   // ══════════════════════════════════════════════════════════════
@@ -406,18 +599,22 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
   return (
     <div className="page">
-      {/* ── Header ── */}
+
+      {/* ── HEADER ── */}
       <div className="glass page-header-card">
         <div className="header-top">
           <div>
             <h1 className="page-title">Kelola Kegiatan</h1>
-            <p className="page-subtitle">Buat kegiatan, assign pegawai, dan kelola absensi dinamis</p>
+            <p className="page-subtitle">
+              Buat kegiatan, assign pegawai, tambah metode penilaian (nilai bebas),
+              dan atur kolom ABSEN di ujung kanan tabel.
+            </p>
           </div>
           <ClipboardList size={48} color="#3b82f6" />
         </div>
       </div>
 
-      {/* ── Form ── */}
+      {/* ── FORM KEGIATAN ── */}
       <div className="glass">
         <h2 className="section-title">
           {editKegiatanId ? "✏️ Edit Kegiatan" : "➕ Tambah Kegiatan"}
@@ -425,97 +622,123 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
         <form onSubmit={submitKegiatan}>
           <div className="form-grid">
+
+            {/* Nama Kegiatan */}
             <input
               type="text"
-              name="nama_kegiatan"
               placeholder="Nama Kegiatan *"
-              value={kegiatanForm.nama_kegiatan}
-              onChange={handleKegiatanChange}
+              value={formNamaKegiatan}
+              onChange={(e) => setFormNamaKegiatan(e.target.value)}
               required
               className="form-input"
             />
 
+            {/* Deskripsi */}
             <input
               type="text"
-              name="deskripsi"
               placeholder="Deskripsi"
-              value={kegiatanForm.deskripsi}
-              onChange={handleKegiatanChange}
+              value={formDeskripsi}
+              onChange={(e) => setFormDeskripsi(e.target.value)}
               className="form-input"
             />
 
+            {/* Tanggal */}
             <div className="form-input-group">
               <label className="form-label">
                 <Calendar size={12} style={{ display: "inline", marginRight: 4 }} />
-                Hari / Tanggal
+                Tanggal Pelaksanaan
               </label>
               <input
                 type="date"
-                name="tanggal_pelaksanaan"
-                value={kegiatanForm.tanggal_pelaksanaan}
-                onChange={handleKegiatanChange}
+                value={formTanggal}
+                onChange={(e) => setFormTanggal(e.target.value)}
                 className="form-input"
               />
             </div>
 
+            {/* Materi */}
+            <div className="form-input-group">
+              <label className="form-label">
+                <BookOpen size={12} style={{ display: "inline", marginRight: 4 }} />
+                Materi
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Lari, Push Up, Sit Up"
+                value={formMateri}
+                onChange={(e) => setFormMateri(e.target.value)}
+                className="form-input"
+              />
+            </div>
+
+            {/* Instruktur */}
             <div className="form-input-group">
               <label className="form-label">
                 <User size={12} style={{ display: "inline", marginRight: 4 }} />
                 Instruktur
               </label>
               <select
-                name="instruktur_id"
-                value={kegiatanForm.instruktur_id}
-                onChange={handleKegiatanChange}
+                value={formInstrukturId}
+                onChange={(e) => setFormInstrukturId(e.target.value)}
                 className="form-input"
               >
                 <option value="">— Pilih Instruktur —</option>
                 {sortedPegawai.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nama_pegawai}
-                    {p.jabatan ? ` — ${p.jabatan}` : ""}
+                    {p.nama_pegawai}{p.jabatan ? ` — ${p.jabatan}` : ""}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Asisten */}
             <div className="form-input-group">
               <label className="form-label">
                 <Users size={12} style={{ display: "inline", marginRight: 4 }} />
                 Asisten
               </label>
               <select
-                name="asisten_id"
-                value={kegiatanForm.asisten_id}
-                onChange={handleKegiatanChange}
+                value={formAsistenId}
+                onChange={(e) => setFormAsistenId(e.target.value)}
                 className="form-input"
               >
                 <option value="">— Pilih Asisten —</option>
                 {sortedPegawai.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nama_pegawai}
-                    {p.jabatan ? ` — ${p.jabatan}` : ""}
+                    {p.nama_pegawai}{p.jabatan ? ` — ${p.jabatan}` : ""}
                   </option>
                 ))}
               </select>
             </div>
 
-            <input
-              type="text"
-              name="materi"
-              placeholder="Materi"
-              value={kegiatanForm.materi}
-              onChange={handleKegiatanChange}
-              className="form-input"
-            />
+            {/* Pejabat yang Mengetahui */}
+            <div className="form-input-group">
+              <label className="form-label">
+                <Shield size={12} style={{ display: "inline", marginRight: 4 }} />
+                Pejabat yang Mengetahui
+              </label>
+              <select
+                value={formPejabatId}
+                onChange={(e) => setFormPejabatId(e.target.value)}
+                className="form-input"
+              >
+                <option value="">— Pilih Pejabat —</option>
+                {sortedPegawai.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nama_pegawai}{p.jabatan ? ` — ${p.jabatan}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
           </div>
 
           <div className="form-actions">
             <button type="submit" className="btn-primary">
-              {editKegiatanId ? "💾 Update" : "➕ Tambah"}
+              {editKegiatanId ? "💾 Update Kegiatan" : "➕ Tambah Kegiatan"}
             </button>
             {editKegiatanId && (
-              <button type="button" className="btn-secondary" onClick={cancelEdit}>
+              <button type="button" className="btn-secondary" onClick={resetFormKegiatan}>
                 ❌ Batal
               </button>
             )}
@@ -523,19 +746,18 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
         </form>
       </div>
 
-      {/* ── List Kegiatan ── */}
+      {/* ── LIST KEGIATAN ── */}
       {kegiatanList.map((item) => {
         const assignedPegawai = getAssignedPegawai(item.id);
+        const kCols = item.keterangan_columns ?? [];
 
         return (
           <div key={item.id} className="glass kegiatan-card">
             <div className="kegiatan-card-header">
               <div className="kegiatan-card-info">
                 <FolderOpen size={24} color="#3b82f6" />
-
                 <div style={{ flex: 1 }}>
                   <h3 className="kegiatan-card-title">{item.nama_kegiatan}</h3>
-
                   {item.deskripsi && (
                     <p className="kegiatan-card-desc">{item.deskripsi}</p>
                   )}
@@ -544,7 +766,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                     {item.tanggal_pelaksanaan && (
                       <div className="kegiatan-info-item">
                         <Calendar size={14} color="#3b82f6" />
-                        <span className="kegiatan-info-label">Hari/Tanggal:</span>
+                        <span className="kegiatan-info-label">Tanggal:</span>
                         <span className="kegiatan-info-value">
                           {formatTanggal(item.tanggal_pelaksanaan)}
                         </span>
@@ -571,6 +793,16 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                       </div>
                     )}
 
+                    {item.pejabat_id && (
+                      <div className="kegiatan-info-item">
+                        <Shield size={14} color="#d97706" />
+                        <span className="kegiatan-info-label">Pejabat:</span>
+                        <span className="kegiatan-info-value">
+                          {getNamaPegawai(item.pejabat_id)}
+                        </span>
+                      </div>
+                    )}
+
                     {item.materi && (
                       <div className="kegiatan-info-item">
                         <BookOpen size={14} color="#8b5cf6" />
@@ -584,48 +816,61 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                         👥 {assignedPegawai.length} pegawai
                       </span>
                     </div>
+
+                    {kCols.length > 0 && (
+                      <div className="kegiatan-info-item">
+                        <span
+                          className="kegiatan-assigned-badge"
+                          style={{ background: "#0ea5e9" }}
+                        >
+                          📋 Absen: {kCols.join(", ")}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Action buttons */}
+              {/* Action Buttons */}
               <div className="kegiatan-card-actions">
                 <button
                   className="btn-assign"
+                  title="Atur Pegawai"
                   onClick={() => {
                     setAssignKegiatanId(item.id);
                     setShowAssignModal(true);
                   }}
-                  title="Atur Pegawai"
                 >
                   <Plus size={16} /> Pegawai
                 </button>
-                
+
                 <button
                   className="btn-absen"
-                  onClick={() => openAbsenModal(item.id)}
-                  title="Kelola Absensi"
+                  title="Kelola Penilaian & Absen"
+                  onClick={() => openKelola(item)}
                 >
-                  <ListChecks size={16} /> Absensi
+                  <ListChecks size={16} /> Penilaian
                 </button>
 
-                <button className="btn-edit" onClick={() => editKegiatan(item)}>
+                <button className="btn-edit" onClick={() => handleEditKegiatan(item)}>
                   <Edit2 size={16} />
                 </button>
-                <button className="btn-delete" onClick={() => deleteKegiatan(item.id)}>
+
+                <button className="btn-delete" onClick={() => handleDeleteKegiatan(item.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
 
+            {/* Chips pegawai */}
             {assignedPegawai.length > 0 && (
               <div className="assigned-pegawai-list">
                 {assignedPegawai.map((p) => (
                   <div key={p.id} className="assigned-pegawai-chip">
                     <span>{p.nama_pegawai}</span>
                     <button
-                      onClick={() => togglePegawai(item.id, p.id)}
                       className="chip-remove"
+                      onClick={() => togglePegawai(item.id, p.id)}
                     >
                       ×
                     </button>
@@ -638,39 +883,31 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
       })}
 
       {kegiatanList.length === 0 && (
-        <div className="glass" style={{ textAlign: "center", padding: "60px" }}>
+        <div className="glass" style={{ textAlign: "center", padding: 60 }}>
           <ClipboardList size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
           <p style={{ color: "#64748b" }}>Belum ada kegiatan.</p>
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* MODAL ASSIGN PEGAWAI */}
+      {/* MODAL: ASSIGN PEGAWAI                                          */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showAssignModal && assignKegiatanId && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+
             <div className="modal-header">
               <h2>Atur Pegawai untuk Kegiatan</h2>
-              <button
-                className="modal-close"
-                onClick={() => setShowAssignModal(false)}
-              >
+              <button className="modal-close" onClick={() => setShowAssignModal(false)}>
                 <X size={20} />
               </button>
             </div>
 
             <div className="modal-actions-row">
-              <button
-                className="btn-select-all"
-                onClick={() => selectAll(assignKegiatanId)}
-              >
+              <button className="btn-select-all" onClick={() => selectAllPegawai(assignKegiatanId)}>
                 ✅ Pilih Semua
               </button>
-              <button
-                className="btn-deselect-all"
-                onClick={() => deselectAll(assignKegiatanId)}
-              >
+              <button className="btn-deselect-all" onClick={() => deselectAllPegawai(assignKegiatanId)}>
                 ❌ Hapus Semua
               </button>
               <span className="modal-count">
@@ -688,11 +925,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                   <div key={cluster}>
                     <div
                       className="modal-cluster-label"
-                      style={{
-                        color: cfg.color,
-                        borderLeft: `3px solid ${cfg.color}`,
-                        paddingLeft: 12,
-                      }}
+                      style={{ color: cfg.color, borderLeft: `3px solid ${cfg.color}`, paddingLeft: 12 }}
                     >
                       {cluster} ({list.length})
                     </div>
@@ -712,11 +945,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                           />
                           <div
                             className={`custom-checkbox ${checked ? "checked" : ""}`}
-                            style={
-                              checked
-                                ? { background: cfg.color, borderColor: cfg.color }
-                                : {}
-                            }
+                            style={checked ? { background: cfg.color, borderColor: cfg.color } : {}}
                           >
                             {checked && <Check size={14} color="white" strokeWidth={3} />}
                           </div>
@@ -731,10 +960,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
             </div>
 
             <div className="modal-footer">
-              <button
-                className="btn-primary"
-                onClick={() => setShowAssignModal(false)}
-              >
+              <button className="btn-primary" onClick={() => setShowAssignModal(false)}>
                 Selesai
               </button>
             </div>
@@ -743,164 +969,380 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* MODAL ABSENSI */}
+      {/* MODAL: KELOLA PENILAIAN & ABSEN KANAN                         */}
       {/* ══════════════════════════════════════════════════════════════ */}
-      {showAbsenModal && absenKegiatanId && (
-        <div className="modal-overlay" onClick={() => setShowAbsenModal(false)}>
+      {showKelolaModal && kelolaKegiatan && (
+        <div className="modal-overlay" onClick={closeKelola}>
           <div
             className="modal-content modal-absen"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* HEADER MODAL */}
             <div className="modal-header">
-              <h2>📋 Kelola Absensi Dinamis</h2>
-              <button
-                className="modal-close"
-                onClick={() => setShowAbsenModal(false)}
-              >
+              <div>
+                <h2>📋 Kelola Penilaian — {kelolaKegiatan.nama_kegiatan}</h2>
+                <p style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                  Tanggal input: {today}
+                </p>
+              </div>
+              <button className="modal-close" onClick={closeKelola}>
                 <X size={20} />
               </button>
             </div>
 
-            {/* Add Kolom Section */}
+            {/* ── SECTION 1: TAMBAH METODE PENILAIAN ── */}
             <div className="absen-kolom-section">
-              <h3 style={{ marginBottom: 12, fontSize: 16, color: "#475569" }}>
-                Tambah Kolom Absensi
+              <h3 style={{ marginBottom: 4, fontSize: 16, color: "#0f172a" }}>
+                1️⃣ Tambah Metode Penilaian (Nilai Free Text)
               </h3>
-              
-              <div className="kolom-form-grid">
+              <p style={{ fontSize: 13, color: "#64748b", marginBottom: 14 }}>
+                Satu kategori (misal: <strong>Kebugaran Fisik</strong>) bisa punya banyak metode.
+                Tambah satu per satu.
+              </p>
+
+              <div className="form-grid" style={{ gridTemplateColumns: "2fr 2fr 1fr" }}>
                 <div className="form-input-group">
-                  <label className="form-label">Nama Kategori *</label>
+                  <label className="form-label">Nama Kategori</label>
                   <input
                     type="text"
-                    placeholder="Contoh: Daya Tahan Jantung"
-                    value={newKolomForm.nama_kategori}
-                    onChange={(e) => setNewKolomForm(prev => ({ 
-                      ...prev, 
-                      nama_kategori: e.target.value 
-                    }))}
                     className="form-input"
+                    placeholder="Contoh: Kebugaran Fisik"
+                    value={formKategori}
+                    onChange={(e) => setFormKategori(e.target.value)}
                   />
                 </div>
 
                 <div className="form-input-group">
-                  <label className="form-label">Metode</label>
+                  <label className="form-label">Metode Penilaian *</label>
                   <input
                     type="text"
-                    placeholder="Contoh: Lari 2.4 KM"
-                    value={newKolomForm.metode}
-                    onChange={(e) => setNewKolomForm(prev => ({ 
-                      ...prev, 
-                      metode: e.target.value 
-                    }))}
                     className="form-input"
+                    placeholder="Contoh: Push Up / Lari 2.4 KM / Pull Up"
+                    value={formMetode}
+                    onChange={(e) => setFormMetode(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMetodePenilaian(); } }}
                   />
                 </div>
 
                 <div className="form-input-group">
-                  <label className="form-label">Satuan</label>
+                  <label className="form-label">Satuan (opsional)</label>
                   <input
                     type="text"
-                    placeholder="Contoh: vol 2 max"
-                    value={newKolomForm.satuan}
-                    onChange={(e) => setNewKolomForm(prev => ({ 
-                      ...prev, 
-                      satuan: e.target.value 
-                    }))}
                     className="form-input"
+                    placeholder="rep/mnt / meter"
+                    value={formSatuan}
+                    onChange={(e) => setFormSatuan(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMetodePenilaian(); } }}
                   />
                 </div>
               </div>
 
-              <button
-                onClick={addKolomAbsen}
-                className="btn-primary"
-                style={{ marginTop: 12 }}
-              >
-                <Plus size={16} /> Tambah Kolom
+              <button className="btn-primary" onClick={addMetodePenilaian} style={{ marginTop: 12 }}>
+                <Plus size={16} /> Tambah Metode
               </button>
 
-              {/* Display kolom yang sudah ada */}
-              {kolomAbsenList.length > 0 && (
-                <div className="kolom-list" style={{ marginTop: 16 }}>
-                  {kolomAbsenList.map((kolom) => (
-                    <div key={kolom.id} className="kolom-display-card">
-                      <div className="kolom-content">
-                        <div className="kolom-kategori">{kolom.nama_kategori}</div>
-                        {kolom.metode && <div className="kolom-detail">📍 {kolom.metode}</div>}
-                        {kolom.satuan && <div className="kolom-detail">📊 {kolom.satuan}</div>}
-                      </div>
-                      <button
-                        onClick={() => deleteKolomAbsen(kolom.id)}
-                        className="kolom-delete"
-                        title="Hapus kolom"
+              {/* Daftar metode yang sudah ada, dikelompok per kategori */}
+              {groupedKolom.size > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <p style={{ fontWeight: 600, color: "#475569", marginBottom: 8 }}>
+                    Metode yang sudah ditambahkan:
+                  </p>
+
+                  {[...groupedKolom.entries()].map(([kategori, methods]) => (
+                    <div key={kategori} style={{ marginBottom: 12 }}>
+                      {/* label kategori */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontWeight: 700,
+                          color: "#0f172a",
+                          fontSize: 14,
+                          marginBottom: 6,
+                          padding: "6px 10px",
+                          background: "#f1f5f9",
+                          borderRadius: 8,
+                        }}
                       >
-                        <Trash2 size={14} />
-                      </button>
+                        <Layers size={16} color="#3b82f6" />
+                        {kategori}
+                        <span style={{ fontWeight: 400, color: "#64748b" }}>
+                          ({methods.length} metode)
+                        </span>
+                      </div>
+
+                      {/* metode-metode di kategori ini */}
+                      <div style={{ paddingLeft: 8 }}>
+                        {methods.map((m) => (
+                          <div key={m.id} className="kolom-display-card" style={{ marginBottom: 6 }}>
+                            <div className="kolom-content">
+                              <div className="kolom-kategori" style={{ fontSize: 14 }}>
+                                {m.metode || "(Tanpa metode)"}
+                              </div>
+                              {m.satuan && (
+                                <div className="kolom-detail">Satuan: {m.satuan}</div>
+                              )}
+                            </div>
+                            <button
+                              className="kolom-delete"
+                              title="Hapus metode ini"
+                              onClick={() => deleteMetodePenilaian(m.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Tabel Absensi */}
-            {kolomAbsenList.length > 0 ? (
-              <div className="absen-table-wrapper">
-                <table className="absen-table">
-                  <thead>
-                    <tr>
-                      <th className="th-nama-pegawai">Nama Pegawai</th>
-                      {kolomAbsenList.map((kolom) => (
-                        <th key={kolom.id} className="th-kolom-absen">
-                          <div className="th-kolom-content">
-                            <div className="th-kategori">{kolom.nama_kategori}</div>
-                            {kolom.metode && <div className="th-metode">{kolom.metode}</div>}
-                            {kolom.satuan && <div className="th-satuan">{kolom.satuan}</div>}
-                          </div>
+            {/* ── SECTION 2: PILIH KOLOM ABSEN KANAN ── */}
+            <div className="absen-kolom-section">
+              <h3 style={{ marginBottom: 4, fontSize: 16, color: "#0f172a" }}>
+                2️⃣ Pilih Kolom ABSEN (tampil di ujung kanan tabel)
+              </h3>
+              <p style={{ fontSize: 13, color: "#64748b", marginBottom: 14 }}>
+                Centang keterangan yang ingin ditampilkan sebagai kolom checkbox di
+                sebelah kanan kolom penilaian.
+              </p>
+
+              <div className="keterangan-checkbox-grid">
+                {keteranganOptions.map((ket) => {
+                  const isChecked = keteranganColumns.includes(ket);
+                  const color = keteranganColors[ket];
+
+                  return (
+                    <label
+                      key={ket}
+                      className={`keterangan-checkbox-item ${isChecked ? "checked" : ""}`}
+                      style={isChecked ? { borderColor: color, background: `${color}18` } : {}}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleKeteranganColumn(ket)}
+                        className="hidden-checkbox"
+                      />
+                      <div
+                        className={`custom-checkbox ${isChecked ? "checked" : ""}`}
+                        style={isChecked ? { background: color, borderColor: color } : {}}
+                      >
+                        {isChecked && <Check size={14} color="white" strokeWidth={3} />}
+                      </div>
+                      <span style={{ fontWeight: isChecked ? 700 : 500, fontSize: 14 }}>{ket}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 14, alignItems: "center" }}>
+                <button className="btn-primary" onClick={saveKeteranganColumns}>
+                  <Save size={16} /> Simpan Kolom ABSEN
+                </button>
+                <span style={{ fontSize: 13, color: "#64748b" }}>
+                  {keteranganColumns.length} kolom dipilih
+                </span>
+              </div>
+            </div>
+
+            {/* ── SECTION 3: TABEL INPUT PENILAIAN + ABSEN KANAN ── */}
+            <div style={{ margin: "0 24px 24px" }}>
+              <h3 style={{ marginBottom: 10, fontSize: 16, color: "#0f172a" }}>
+                3️⃣ Input Nilai & Absen Pegawai
+              </h3>
+
+              {allMetode.length === 0 && keteranganColumns.length === 0 ? (
+                <div
+                  className="glass"
+                  style={{ textAlign: "center", padding: 40, color: "#64748b" }}
+                >
+                  <p>Belum ada metode penilaian maupun kolom ABSEN.</p>
+                  <p style={{ fontSize: 13, marginTop: 4 }}>
+                    Tambahkan metode di atas atau pilih kolom ABSEN terlebih dahulu.
+                  </p>
+                </div>
+              ) : (
+                <div className="absen-table-wrapper">
+                  <table className="absen-table">
+                    <thead>
+
+                      {/* ─ ROW 1: HEADER KATEGORI + HEADER "ABSEN" ─ */}
+                      <tr>
+                        {/* Kolom nama pegawai — rowspan 2 */}
+                        <th
+                          className="th-nama-pegawai"
+                          rowSpan={2}
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          Nama Pegawai
                         </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getAssignedPegawai(absenKegiatanId)
-                      .sort((a, b) => a.nama_pegawai.localeCompare(b.nama_pegawai, "id"))
-                      .map((pegawai) => (
-                        <tr key={pegawai.id}>
-                          <td className="pegawai-name-cell">{pegawai.nama_pegawai}</td>
-                          {kolomAbsenList.map((kolom) => {
-                            const absen = getAbsensiStatus(pegawai.id, kolom.id);
-                            const currentNilai = absen?.nilai || "";
 
-                            return (
-                              <td key={kolom.id} className="absen-cell">
-                                <input
-                                  type="text"
-                                  value={currentNilai}
-                                  onChange={(e) =>
-                                    updateAbsensi(pegawai.id, kolom.id, e.target.value)
-                                  }
-                                  className="absen-input"
-                                  placeholder="-"
-                                />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>
-                <Table size={48} color="#cbd5e1" style={{ marginBottom: 16 }} />
-                <p>Belum ada kolom absensi. Tambahkan kolom terlebih dahulu.</p>
-              </div>
-            )}
+                        {/* Setiap kategori: colspan = jumlah metodenya */}
+                        {[...groupedKolom.entries()].map(([kategori, methods]) => (
+                          <th
+                            key={kategori}
+                            className="th-kolom-absen"
+                            colSpan={methods.length}
+                          >
+                            <div className="th-kolom-content">
+                              <div className="th-kategori">{kategori}</div>
+                            </div>
+                          </th>
+                        ))}
 
+                        {/* Header gabung "ABSEN" — colspan = jumlah keterangan dipilih */}
+                        {keteranganColumns.length > 0 && (
+                          <th
+                            className="th-kolom-absen"
+                            colSpan={keteranganColumns.length}
+                            style={{
+                              background: "linear-gradient(135deg,#e0f2fe,#bae6fd)",
+                              borderLeft: "3px solid #0ea5e9",
+                            }}
+                          >
+                            <div className="th-kolom-content">
+                              <div className="th-kategori" style={{ color: "#0369a1" }}>
+                                ABSEN
+                              </div>
+                            </div>
+                          </th>
+                        )}
+                      </tr>
+
+                      {/* ─ ROW 2: SUB-HEADER METODE + SUB-HEADER KETERANGAN ─ */}
+                      <tr>
+                        {/* Sub-header per metode */}
+                        {allMetode.map((m) => (
+                          <th key={m.id} className="th-sub-kolom">
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 2,
+                              }}
+                            >
+                              <span style={{ fontWeight: 700, fontSize: 12 }}>
+                                {m.metode || "-"}
+                              </span>
+                              {m.satuan && (
+                                <span style={{ fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                                  {m.satuan}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                        ))}
+
+                        {/* Sub-header keterangan absen kanan */}
+                        {keteranganColumns.map((ket) => (
+                          <th
+                            key={ket}
+                            className="th-sub-kolom"
+                            style={{
+                              background: `${keteranganColors[ket]}22`,
+                              borderBottom: `3px solid ${keteranganColors[ket]}`,
+                            }}
+                          >
+                            {ket}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {getAssignedPegawai(kelolaKegiatan.id)
+                        .sort((a, b) => (a.urutan ?? 999999) - (b.urutan ?? 999999))
+                        .map((pegawai) => {
+                          const currentKet = getKeteranganPegawai(pegawai.id);
+
+                          return (
+                            <tr key={pegawai.id}>
+                              {/* Nama */}
+                              <td className="pegawai-name-cell">{pegawai.nama_pegawai}</td>
+
+                              {/* Nilai free text per metode */}
+                              {allMetode.map((m) => {
+                                const key = cellKey(pegawai.id, m.id);
+                                const val = getNilaiCell(pegawai.id, m.id);
+
+                                return (
+                                  <td key={m.id} className="absen-cell">
+                                    <input
+                                      className="absen-input"
+                                      value={val}
+                                      placeholder="-"
+                                      onChange={(e) =>
+                                        setDraftNilai((prev) => ({
+                                          ...prev,
+                                          [key]: e.target.value,
+                                        }))
+                                      }
+                                      onBlur={() => saveNilaiCell(pegawai.id, m.id)}
+                                    />
+                                  </td>
+                                );
+                              })}
+
+                              {/* Checkbox keterangan (radio-style: 1 pilihan) */}
+                              {keteranganColumns.map((ket) => {
+                                const checked = currentKet === ket;
+
+                                return (
+                                  <td key={ket} className="absen-cell">
+                                    <label className="checkbox-wrapper">
+                                      <input
+                                        type="checkbox"
+                                        className="hidden-checkbox"
+                                        checked={checked}
+                                        onChange={() =>
+                                          setKeteranganPegawai(
+                                            pegawai.id,
+                                            checked ? null : ket
+                                          )
+                                        }
+                                      />
+                                      <div
+                                        className={`custom-checkbox ${checked ? "checked" : ""}`}
+                                        style={
+                                          checked
+                                            ? {
+                                                background: keteranganColors[ket],
+                                                borderColor: keteranganColors[ket],
+                                              }
+                                            : {}
+                                        }
+                                      >
+                                        {checked && (
+                                          <Check size={14} color="white" strokeWidth={3} />
+                                        )}
+                                      </div>
+                                    </label>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+
+                  {getAssignedPegawai(kelolaKegiatan.id).length === 0 && (
+                    <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>
+                      <p>Belum ada pegawai yang di-assign ke kegiatan ini.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER MODAL */}
             <div className="modal-footer">
-              <button
-                className="btn-primary"
-                onClick={() => setShowAbsenModal(false)}
-              >
+              <button className="btn-primary" onClick={closeKelola}>
                 <Save size={16} /> Selesai
               </button>
             </div>

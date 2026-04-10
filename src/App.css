@@ -1612,3 +1612,182 @@
   background: rgba(59, 130, 246, 0.05);
   border-color: var(--primary);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   KETERANGAN CHECKBOX GRID
+   ══════════════════════════════════════════════════════════════ */
+   .keterangan-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+  }
+  
+  .keterangan-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+  }
+  
+  .keterangan-checkbox-item:hover {
+    border-color: var(--gray-400);
+    transform: translateY(-1px);
+  }
+  
+  .keterangan-checkbox-item.checked {
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* ══════════════════════════════════════════════════════════════
+     KOLOM DISPLAY CARD
+     ══════════════════════════════════════════════════════════════ */
+  .kolom-display-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: white;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--gray-200);
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+  
+  .kolom-display-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  }
+  
+  .kolom-content {
+    flex: 1;
+  }
+  
+  .kolom-kategori {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 6px;
+  }
+  
+  .kolom-detail {
+    font-size: 12px;
+    color: var(--gray-600);
+    margin-top: 3px;
+    line-height: 1.6;
+  }
+  
+  .kolom-delete {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+    margin-left: 12px;
+  }
+  
+  .kolom-delete:hover {
+    background: #fee2e2;
+    transform: scale(1.1);
+  }
+  
+  /* ══════════════════════════════════════════════════════════════
+     TABLE HEADER HIERARKI
+     ══════════════════════════════════════════════════════════════ */
+  .th-kolom-absen {
+    min-width: 150px;
+    text-align: center;
+    padding: 12px 8px !important;
+    background: var(--gray-50);
+    vertical-align: bottom;
+  }
+  
+  .th-kolom-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+  
+  .th-kategori {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-900);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  
+  .th-metode {
+    font-size: 11px;
+    color: var(--primary);
+    font-weight: 600;
+  }
+  
+  .th-satuan {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-style: italic;
+  }
+  
+  .th-sub-kolom {
+    min-width: 80px;
+    padding: 8px 6px !important;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .th-nama-pegawai {
+    min-width: 200px;
+    position: sticky;
+    left: 0;
+    background: var(--gray-50);
+    z-index: 15;
+    font-weight: 700;
+  }
+  
+  /* ══════════════════════════════════════════════════════════════
+     MODAL ABSEN KHUSUS
+     ══════════════════════════════════════════════════════════════ */
+  .modal-absen {
+    max-width: 95vw;
+    width: 1400px;
+  }
+  
+  .absen-kolom-section {
+    background: var(--gray-50);
+    padding: 20px;
+    margin: 0 24px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--gray-200);
+  }
+  
+  .kolom-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  
+  @media (max-width: 768px) {
+    .kolom-form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .kolom-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }

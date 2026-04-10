@@ -53,6 +53,7 @@ export const keteranganOptions: KeteranganAbsen[] = [
   "Cuti",
   "Izin",
   "Sakit",
+  "Lepas Piket", // ← TAMBAHAN
   "Alpha",
 ];
 
@@ -63,6 +64,7 @@ export const keteranganColors: Record<KeteranganAbsen, string> = {
   Cuti: "#f59e0b",
   Izin: "#eab308",
   Sakit: "#a855f7",
+  "Lepas Piket": "#06b6d4", // ← TAMBAHAN (warna cyan)
   Alpha: "#ef4444",
 };
 
