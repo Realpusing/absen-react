@@ -12,6 +12,7 @@ import {
   XCircle,
   Check,
   Table as TableIcon,
+  Layers,
 } from "lucide-react";
 import { supabase } from "../supabase";
 import type {
@@ -22,6 +23,7 @@ import type {
   ClusterType,
   KolomAbsen,
   Absensi,
+  AbsensiKeterangan,
 } from "../types";
 import {
   clusterOptions,
@@ -37,6 +39,11 @@ interface KegiatanPegawaiRow {
   id: number;
   kegiatan_id: number;
   pegawai_id: number;
+}
+
+interface KegiatanExtended extends Kegiatan {
+  pejabat_id?: number | null;
+  keterangan_columns?: KeteranganAbsen[] | null;
 }
 
 interface Props {
@@ -58,7 +65,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   // STATE - KEGIATAN
   // ══════════════════════════════════════════════════════════════
   
-  const [kegiatanList, setKegiatanList] = useState<Kegiatan[]>([]);
+  const [kegiatanList, setKegiatanList] = useState<KegiatanExtended[]>([]);
   const [kegiatanPegawaiRows, setKegiatanPegawaiRows] = useState<KegiatanPegawaiRow[]>([]);
   const [selectedKegiatanId, setSelectedKegiatanId] = useState<number | null>(null);
 
@@ -68,6 +75,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   
   const [kolomAbsenList, setKolomAbsenList] = useState<KolomAbsen[]>([]);
   const [absensiKegiatanData, setAbsensiKegiatanData] = useState<Absensi[]>([]);
+  const [absensiKeteranganList, setAbsensiKeteranganList] = useState<AbsensiKeterangan[]>([]);
+
+  // ══════════════════════════════════════════════════════════════
+  // STATE - DRAFT NILAI (save on blur)
+  // ══════════════════════════════════════════════════════════════
+  
+  const [draftNilai, setDraftNilai] = useState<Record<string, string>>({});
 
   // ══════════════════════════════════════════════════════════════
   // STATE - EXPORT
@@ -111,7 +125,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       return;
     }
 
-    setKegiatanList((data as Kegiatan[]) || []);
+    setKegiatanList((data as KegiatanExtended[]) || []);
   };
 
   const fetchKegiatanPegawai = async () => {
@@ -155,6 +169,20 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     setAbsensiKegiatanData((data as Absensi[]) || []);
   };
 
+  const fetchAbsensiKeterangan = async (kegiatanId: number, tanggal: string) => {
+    const { data, error } = await supabase
+      .from("absensi_keterangan")
+      .select("*")
+      .eq("kegiatan_id", kegiatanId)
+      .eq("tanggal", tanggal);
+
+    if (error) {
+      console.error("Gagal fetch absensi keterangan:", error.message);
+      return;
+    }
+    setAbsensiKeteranganList((data as AbsensiKeterangan[]) || []);
+  };
+
   // ══════════════════════════════════════════════════════════════
   // USE EFFECT
   // ══════════════════════════════════════════════════════════════
@@ -171,11 +199,15 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       fetchAbsenByDate(selectedDate);
       setKolomAbsenList([]);
       setAbsensiKegiatanData([]);
+      setAbsensiKeteranganList([]);
+      setDraftNilai({});
     } else {
       // Absen kegiatan dengan kolom dinamis
       fetchKolomAbsen(selectedKegiatanId);
       fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+      fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
       setAbsenList([]);
+      setDraftNilai({});
     }
   }, [selectedDate, selectedKegiatanId]);
 
@@ -199,15 +231,36 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     return pegawaiList.filter((p) => ids.includes(p.id));
   }, [pegawaiList, selectedKegiatanId, kegiatanPegawaiRows]);
 
-  const filteredPegawai = absenPegawaiList.filter((p) =>
-    p.nama_pegawai.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPegawai = useMemo(() => {
+    return absenPegawaiList
+      .filter((p) => p.nama_pegawai.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => (a.urutan ?? 999999) - (b.urutan ?? 999999));
+  }, [absenPegawaiList, searchTerm]);
 
   const filteredPenanggungJawab = pegawaiList.filter((pegawai) =>
     pegawai.nama_pegawai.toLowerCase().includes(penanggungJawab.toLowerCase())
   );
 
   const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
+
+  // Kolom keterangan yang dipilih untuk kegiatan ini
+  const keteranganColumns = selectedKegiatan?.keterangan_columns ?? [];
+
+  // Group kolom by kategori
+  const groupedKolom = useMemo(() => {
+    const map = new Map<string, KolomAbsen[]>();
+    for (const k of kolomAbsenList) {
+      if (!map.has(k.nama_kategori)) map.set(k.nama_kategori, []);
+      map.get(k.nama_kategori)!.push(k);
+    }
+    return map;
+  }, [kolomAbsenList]);
+
+  // Semua metode dalam urutan tampil
+  const allMetode = useMemo(
+    () => [...groupedKolom.values()].flat(),
+    [groupedKolom]
+  );
 
   // ══════════════════════════════════════════════════════════════
   // HELPER FUNCTIONS - ABSEN HARIAN
@@ -263,57 +316,107 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   };
 
   // ══════════════════════════════════════════════════════════════
-  // HELPER FUNCTIONS - ABSENSI KEGIATAN (KOLOM DINAMIS)
+  // HELPER FUNCTIONS - NILAI PENILAIAN (save on blur)
   // ══════════════════════════════════════════════════════════════
 
-  const getNilaiAbsensi = (pegawaiId: number, kolomId: number) => {
-    const found = absensiKegiatanData.find(
+  const cellKey = (pegawaiId: number, kolomId: number) => `${pegawaiId}_${kolomId}`;
+
+  const getNilaiCell = (pegawaiId: number, kolomId: number) => {
+    const key = cellKey(pegawaiId, kolomId);
+    if (key in draftNilai) return draftNilai[key];
+    return absensiKegiatanData.find(
       (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
-    );
-    return found?.nilai || "";
+    )?.nilai ?? "";
   };
 
-  const updateNilaiAbsensi = async (
+  const saveNilaiCell = async (pegawaiId: number, kolomId: number) => {
+    if (!selectedKegiatanId) return;
+
+    const key = cellKey(pegawaiId, kolomId);
+    const nilai = (draftNilai[key] ?? "").trim();
+
+    const existing = absensiKegiatanData.find(
+      (a) =>
+        a.pegawai_id === pegawaiId &&
+        a.kolom_absen_id === kolomId &&
+        a.tanggal === selectedDate
+    );
+
+    if (!nilai) {
+      // Hapus jika kosong
+      if (existing) {
+        const { error } = await supabase.from("absensi").delete().eq("id", existing.id);
+        if (error) { console.error("Gagal hapus nilai:", error.message); return; }
+        await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+      }
+      return;
+    }
+
+    const { error } = await supabase.from("absensi").upsert(
+      [{
+        kegiatan_id: selectedKegiatanId,
+        pegawai_id: pegawaiId,
+        kolom_absen_id: kolomId,
+        nilai,
+        tanggal: selectedDate,
+      }],
+      { onConflict: "kegiatan_id,pegawai_id,kolom_absen_id,sub_kolom,tanggal" }
+    );
+
+    if (error) { 
+      console.error("Gagal simpan nilai:", error.message); 
+      return; 
+    }
+
+    await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // HELPER FUNCTIONS - KETERANGAN ABSEN KANAN
+  // ══════════════════════════════════════════════════════════════
+
+  const getKeteranganPegawai = (pegawaiId: number): KeteranganAbsen | null => {
+    const row = absensiKeteranganList.find(
+      (a) => a.pegawai_id === pegawaiId && a.tanggal === selectedDate
+    );
+    return (row?.keterangan as KeteranganAbsen) ?? null;
+  };
+
+  const setKeteranganPegawai = async (
     pegawaiId: number,
-    kolomId: number,
-    nilai: string
+    ket: KeteranganAbsen | null
   ) => {
     if (!selectedKegiatanId) return;
 
-    const existing = absensiKegiatanData.find(
-      (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
+    const existing = absensiKeteranganList.find(
+      (a) => a.pegawai_id === pegawaiId && a.tanggal === selectedDate
     );
 
-    if (existing) {
-      // Update
-      const { error } = await supabase
-        .from("absensi")
-        .update({ nilai })
-        .eq("id", existing.id);
-
-      if (error) {
-        console.error("Gagal update:", error);
-        return;
+    if (!ket) {
+      if (existing) {
+        const { error } = await supabase
+          .from("absensi_keterangan")
+          .delete()
+          .eq("id", existing.id);
+        if (error) { console.error("Gagal hapus keterangan:", error.message); return; }
       }
-    } else {
-      // Insert
-      const { error } = await supabase.from("absensi").insert([
-        {
-          kegiatan_id: selectedKegiatanId,
-          pegawai_id: pegawaiId,
-          kolom_absen_id: kolomId,
-          nilai,
-          tanggal: selectedDate,
-        },
-      ]);
-
-      if (error) {
-        console.error("Gagal insert:", error);
-        return;
-      }
+      await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
+      return;
     }
 
-    fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+    const { error } = await supabase.from("absensi_keterangan").upsert(
+      [{
+        kegiatan_id: selectedKegiatanId,
+        pegawai_id: pegawaiId,
+        tanggal: selectedDate,
+        keterangan: ket,
+      }],
+      { onConflict: "kegiatan_id,pegawai_id,tanggal" }
+    );
+
+    if (error) { console.error("Gagal simpan keterangan:", error.message); return; }
+
+    await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
   };
 
   // ══════════════════════════════════════════════════════════════
@@ -633,13 +736,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
           {clusterOptions.map((cluster) => {
             const cfg = clusterConfig[cluster];
             const Icon = cfg.icon;
-            const list = filteredPegawai
-              .filter((p) => p.cluster === cluster)
-              .sort((a, b) => {
-                const urutanA = a.urutan ?? 999999;
-                const urutanB = b.urutan ?? 999999;
-                return urutanA - urutanB;
-              });
+            const list = filteredPegawai.filter((p) => p.cluster === cluster);
 
             if (list.length === 0) return null;
 
@@ -799,82 +896,195 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* ABSEN KEGIATAN (Kolom Dinamis - Input Bebas) */}
+      {/* ABSEN KEGIATAN (Tabel 2-Level Header + Kolom Kanan) */}
       {/* ══════════════════════════════════════════════════════════════ */}
-      {selectedKegiatanId !== null && kolomAbsenList.length > 0 && (
+      {selectedKegiatanId !== null && (allMetode.length > 0 || keteranganColumns.length > 0) && (
         <div className="glass">
           <div className="table-wrapper">
             <table className="absen-table">
               <thead>
+                {/* ─ ROW 1: HEADER KATEGORI + HEADER "ABSEN" ─ */}
                 <tr>
-                  <th className="th-no">No</th>
-                  <th className="th-nama-pegawai">Nama Pegawai</th>
-                  {kolomAbsenList.map((kolom) => (
-                    <th key={kolom.id} className="th-kolom-absen">
+                  {/* Kolom nama pegawai — rowspan 2 */}
+                  <th
+                    className="th-nama-pegawai"
+                    rowSpan={2}
+                    style={{ verticalAlign: "middle" }}
+                  >
+                    Nama Pegawai
+                  </th>
+
+                  {/* Setiap kategori: colspan = jumlah metodenya */}
+                  {[...groupedKolom.entries()].map(([kategori, methods]) => (
+                    <th
+                      key={kategori}
+                      className="th-kolom-absen"
+                      colSpan={methods.length}
+                    >
                       <div className="th-kolom-content">
-                        <div className="th-kategori">{kolom.nama_kategori}</div>
-                        {kolom.metode && <div className="th-metode">{kolom.metode}</div>}
-                        {kolom.satuan && <div className="th-satuan">{kolom.satuan}</div>}
+                        <div className="th-kategori">{kategori}</div>
                       </div>
+                    </th>
+                  ))}
+
+                  {/* Header gabung "ABSEN" — colspan = jumlah keterangan dipilih */}
+                  {keteranganColumns.length > 0 && (
+                    <th
+                      className="th-kolom-absen"
+                      colSpan={keteranganColumns.length}
+                      style={{
+                        background: "linear-gradient(135deg,#e0f2fe,#bae6fd)",
+                        borderLeft: "3px solid #0ea5e9",
+                      }}
+                    >
+                      <div className="th-kolom-content">
+                        <div className="th-kategori" style={{ color: "#0369a1" }}>
+                          ABSEN
+                        </div>
+                      </div>
+                    </th>
+                  )}
+                </tr>
+
+                {/* ─ ROW 2: SUB-HEADER METODE + SUB-HEADER KETERANGAN ─ */}
+                <tr>
+                  {/* Sub-header per metode */}
+                  {allMetode.map((m) => (
+                    <th key={m.id} className="th-sub-kolom">
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: 2,
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: 12 }}>
+                          {m.metode || "-"}
+                        </span>
+                        {m.satuan && (
+                          <span style={{ fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
+                            {m.satuan}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  ))}
+
+                  {/* Sub-header keterangan absen kanan */}
+                  {keteranganColumns.map((ket) => (
+                    <th
+                      key={ket}
+                      className="th-sub-kolom"
+                      style={{
+                        background: `${keteranganColors[ket]}22`,
+                        borderBottom: `3px solid ${keteranganColors[ket]}`,
+                      }}
+                    >
+                      {ket}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {filteredPegawai
-                  .sort((a, b) => (a.urutan ?? 999) - (b.urutan ?? 999))
-                  .map((pegawai, index) => {
-                    const cfg = clusterConfig[pegawai.cluster];
-                    
-                    return (
-                      <tr key={pegawai.id}>
-                        <td className="td-no">{index + 1}</td>
-                        <td className="pegawai-name-cell">
-                          <div className="nama-cell">
-                            <div
-                              className="avatar"
-                              style={{ background: cfg.gradient }}
-                            >
-                              {pegawai.nama_pegawai.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="nama-text">{pegawai.nama_pegawai}</span>
-                          </div>
-                        </td>
-                        {kolomAbsenList.map((kolom) => {
-                          const nilai = getNilaiAbsensi(pegawai.id, kolom.id);
 
-                          return (
-                            <td key={kolom.id} className="absen-cell">
+              <tbody>
+                {filteredPegawai.map((pegawai) => {
+                  const currentKet = getKeteranganPegawai(pegawai.id);
+                  const cfg = clusterConfig[pegawai.cluster];
+
+                  return (
+                    <tr key={pegawai.id}>
+                      {/* Nama */}
+                      <td className="pegawai-name-cell">
+                        <div className="nama-cell">
+                          <div
+                            className="avatar"
+                            style={{ background: cfg.gradient }}
+                          >
+                            {pegawai.nama_pegawai.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="nama-text">{pegawai.nama_pegawai}</span>
+                        </div>
+                      </td>
+
+                      {/* Nilai free text per metode */}
+                      {allMetode.map((m) => {
+                        const key = cellKey(pegawai.id, m.id);
+                        const val = getNilaiCell(pegawai.id, m.id);
+
+                        return (
+                          <td key={m.id} className="absen-cell">
+                            <input
+                              className="absen-input"
+                              value={val}
+                              placeholder="-"
+                              onChange={(e) =>
+                                setDraftNilai((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                              onBlur={() => saveNilaiCell(pegawai.id, m.id)}
+                            />
+                          </td>
+                        );
+                      })}
+
+                      {/* Checkbox keterangan (radio-style: 1 pilihan) */}
+                      {keteranganColumns.map((ket) => {
+                        const checked = currentKet === ket;
+
+                        return (
+                          <td key={ket} className="absen-cell">
+                            <label className="checkbox-wrapper">
                               <input
-                                type="text"
-                                value={nilai}
-                                onChange={(e) =>
-                                  updateNilaiAbsensi(pegawai.id, kolom.id, e.target.value)
+                                type="checkbox"
+                                className="hidden-checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setKeteranganPegawai(
+                                    pegawai.id,
+                                    checked ? null : ket
+                                  )
                                 }
-                                className="absen-input"
-                                placeholder="-"
                               />
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
+                              <div
+                                className={`custom-checkbox ${checked ? "checked" : ""}`}
+                                style={
+                                  checked
+                                    ? {
+                                        background: keteranganColors[ket],
+                                        borderColor: keteranganColors[ket],
+                                      }
+                                    : {}
+                                }
+                              >
+                                {checked && (
+                                  <Check size={14} color="white" strokeWidth={3} />
+                                )}
+                              </div>
+                            </label>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ── Empty State untuk Kegiatan Tanpa Kolom ── */}
-      {selectedKegiatanId !== null && kolomAbsenList.length === 0 && (
+      {/* ── Empty State untuk Kegiatan Tanpa Kolom & Keterangan ── */}
+      {selectedKegiatanId !== null && allMetode.length === 0 && keteranganColumns.length === 0 && (
         <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
           <TableIcon size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
           <p style={{ color: "#64748b", fontSize: 16, marginBottom: 8 }}>
-            Belum ada kolom absensi untuk kegiatan ini.
+            Belum ada kolom penilaian atau kolom absen untuk kegiatan ini.
           </p>
           <p style={{ color: "#94a3b8", fontSize: 14 }}>
-            Silakan buat kolom absensi di halaman <strong>Kelola Kegiatan</strong> terlebih dahulu.
+            Silakan tambahkan di halaman <strong>Kelola Kegiatan</strong>.
           </p>
         </div>
       )}
