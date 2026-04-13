@@ -185,7 +185,7 @@ export async function exportToExcel({
   absenList,
   kegiatanLabel,
   tanggalMulai,
-  tanggalSelesai,
+  tanggalSelesai: _tanggalSelesai,  // ✅ Prefix _ untuk ignore TypeScript warning
   penanggungJawab,
   jabatanPenanggungJawab,
   hariKerja = 22,
