@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { supabase } from "../supabase";
 import {
-  initialKegiatanForm,
   clusterOptions,
   clusterConfig,
   keteranganOptions,
@@ -442,7 +441,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
     setFormMetode("");
     setFormSatuan("");
-    // biarkan formKategori tetap agar user bisa tambah metode lain di kategori sama
     fetchKolomAbsen(kelolaKegiatan.id);
   };
 
@@ -480,7 +478,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
       return;
     }
 
-    // update list local juga
     setKegiatanList((prev) =>
       prev.map((k) =>
         k.id === kelolaKegiatan.id
@@ -520,7 +517,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
     );
 
     if (!nilai) {
-      // hapus jika ada
       if (existing) {
         const { error } = await supabase.from("absensi").delete().eq("id", existing.id);
         if (error) { console.error("Gagal hapus nilai:", error.message); return; }
@@ -537,7 +533,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
         nilai,
         tanggal: today,
       }],
-      { onConflict: "kegiatan_id,pegawai_id,kolom_absen_id,tanggal" }
+      { onConflict: "kegiatan_id,pegawai_id,kolom_absen_id,sub_kolom,tanggal" }
     );
 
     if (error) { console.error("Gagal simpan nilai:", error.message); return; }
@@ -622,8 +618,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
         <form onSubmit={submitKegiatan}>
           <div className="form-grid">
-
-            {/* Nama Kegiatan */}
             <input
               type="text"
               placeholder="Nama Kegiatan *"
@@ -633,7 +627,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               className="form-input"
             />
 
-            {/* Deskripsi */}
             <input
               type="text"
               placeholder="Deskripsi"
@@ -642,7 +635,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               className="form-input"
             />
 
-            {/* Tanggal */}
             <div className="form-input-group">
               <label className="form-label">
                 <Calendar size={12} style={{ display: "inline", marginRight: 4 }} />
@@ -656,7 +648,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               />
             </div>
 
-            {/* Materi */}
             <div className="form-input-group">
               <label className="form-label">
                 <BookOpen size={12} style={{ display: "inline", marginRight: 4 }} />
@@ -671,7 +662,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               />
             </div>
 
-            {/* Instruktur */}
             <div className="form-input-group">
               <label className="form-label">
                 <User size={12} style={{ display: "inline", marginRight: 4 }} />
@@ -691,7 +681,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               </select>
             </div>
 
-            {/* Asisten */}
             <div className="form-input-group">
               <label className="form-label">
                 <Users size={12} style={{ display: "inline", marginRight: 4 }} />
@@ -711,7 +700,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               </select>
             </div>
 
-            {/* Pejabat yang Mengetahui */}
             <div className="form-input-group">
               <label className="form-label">
                 <Shield size={12} style={{ display: "inline", marginRight: 4 }} />
@@ -730,7 +718,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                 ))}
               </select>
             </div>
-
           </div>
 
           <div className="form-actions">
@@ -831,7 +818,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="kegiatan-card-actions">
                 <button
                   className="btn-assign"
@@ -862,7 +848,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               </div>
             </div>
 
-            {/* Chips pegawai */}
             {assignedPegawai.length > 0 && (
               <div className="assigned-pegawai-list">
                 {assignedPegawai.map((p) => (
@@ -889,13 +874,10 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* MODAL: ASSIGN PEGAWAI                                          */}
-      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: ASSIGN PEGAWAI */}
       {showAssignModal && assignKegiatanId && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-
             <div className="modal-header">
               <h2>Atur Pegawai untuk Kegiatan</h2>
               <button className="modal-close" onClick={() => setShowAssignModal(false)}>
@@ -968,16 +950,10 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* MODAL: KELOLA PENILAIAN & ABSEN KANAN                         */}
-      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: KELOLA PENILAIAN */}
       {showKelolaModal && kelolaKegiatan && (
         <div className="modal-overlay" onClick={closeKelola}>
-          <div
-            className="modal-content modal-absen"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* HEADER MODAL */}
+          <div className="modal-content modal-absen" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h2>📋 Kelola Penilaian — {kelolaKegiatan.nama_kegiatan}</h2>
@@ -990,7 +966,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               </button>
             </div>
 
-            {/* ── SECTION 1: TAMBAH METODE PENILAIAN ── */}
             <div className="absen-kolom-section">
               <h3 style={{ marginBottom: 4, fontSize: 16, color: "#0f172a" }}>
                 1️⃣ Tambah Metode Penilaian (Nilai Free Text)
@@ -1041,7 +1016,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                 <Plus size={16} /> Tambah Metode
               </button>
 
-              {/* Daftar metode yang sudah ada, dikelompok per kategori */}
               {groupedKolom.size > 0 && (
                 <div style={{ marginTop: 16 }}>
                   <p style={{ fontWeight: 600, color: "#475569", marginBottom: 8 }}>
@@ -1050,7 +1024,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
                   {[...groupedKolom.entries()].map(([kategori, methods]) => (
                     <div key={kategori} style={{ marginBottom: 12 }}>
-                      {/* label kategori */}
                       <div
                         style={{
                           display: "flex",
@@ -1072,7 +1045,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                         </span>
                       </div>
 
-                      {/* metode-metode di kategori ini */}
                       <div style={{ paddingLeft: 8 }}>
                         {methods.map((m) => (
                           <div key={m.id} className="kolom-display-card" style={{ marginBottom: 6 }}>
@@ -1100,7 +1072,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               )}
             </div>
 
-            {/* ── SECTION 2: PILIH KOLOM ABSEN KANAN ── */}
             <div className="absen-kolom-section">
               <h3 style={{ marginBottom: 4, fontSize: 16, color: "#0f172a" }}>
                 2️⃣ Pilih Kolom ABSEN (tampil di ujung kanan tabel)
@@ -1149,17 +1120,13 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               </div>
             </div>
 
-            {/* ── SECTION 3: TABEL INPUT PENILAIAN + ABSEN KANAN ── */}
             <div style={{ margin: "0 24px 24px" }}>
               <h3 style={{ marginBottom: 10, fontSize: 16, color: "#0f172a" }}>
                 3️⃣ Input Nilai & Absen Pegawai
               </h3>
 
               {allMetode.length === 0 && keteranganColumns.length === 0 ? (
-                <div
-                  className="glass"
-                  style={{ textAlign: "center", padding: 40, color: "#64748b" }}
-                >
+                <div className="glass" style={{ textAlign: "center", padding: 40, color: "#64748b" }}>
                   <p>Belum ada metode penilaian maupun kolom ABSEN.</p>
                   <p style={{ fontSize: 13, marginTop: 4 }}>
                     Tambahkan metode di atas atau pilih kolom ABSEN terlebih dahulu.
@@ -1169,32 +1136,19 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                 <div className="absen-table-wrapper">
                   <table className="absen-table">
                     <thead>
-
-                      {/* ─ ROW 1: HEADER KATEGORI + HEADER "ABSEN" ─ */}
                       <tr>
-                        {/* Kolom nama pegawai — rowspan 2 */}
-                        <th
-                          className="th-nama-pegawai"
-                          rowSpan={2}
-                          style={{ verticalAlign: "middle" }}
-                        >
+                        <th className="th-nama-pegawai" rowSpan={2} style={{ verticalAlign: "middle" }}>
                           Nama Pegawai
                         </th>
 
-                        {/* Setiap kategori: colspan = jumlah metodenya */}
                         {[...groupedKolom.entries()].map(([kategori, methods]) => (
-                          <th
-                            key={kategori}
-                            className="th-kolom-absen"
-                            colSpan={methods.length}
-                          >
+                          <th key={kategori} className="th-kolom-absen" colSpan={methods.length}>
                             <div className="th-kolom-content">
                               <div className="th-kategori">{kategori}</div>
                             </div>
                           </th>
                         ))}
 
-                        {/* Header gabung "ABSEN" — colspan = jumlah keterangan dipilih */}
                         {keteranganColumns.length > 0 && (
                           <th
                             className="th-kolom-absen"
@@ -1205,30 +1159,17 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                             }}
                           >
                             <div className="th-kolom-content">
-                              <div className="th-kategori" style={{ color: "#0369a1" }}>
-                                ABSEN
-                              </div>
+                              <div className="th-kategori" style={{ color: "#0369a1" }}>ABSEN</div>
                             </div>
                           </th>
                         )}
                       </tr>
 
-                      {/* ─ ROW 2: SUB-HEADER METODE + SUB-HEADER KETERANGAN ─ */}
                       <tr>
-                        {/* Sub-header per metode */}
                         {allMetode.map((m) => (
                           <th key={m.id} className="th-sub-kolom">
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: 2,
-                              }}
-                            >
-                              <span style={{ fontWeight: 700, fontSize: 12 }}>
-                                {m.metode || "-"}
-                              </span>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                              <span style={{ fontWeight: 700, fontSize: 12 }}>{m.metode || "-"}</span>
                               {m.satuan && (
                                 <span style={{ fontSize: 10, color: "#64748b", fontStyle: "italic" }}>
                                   {m.satuan}
@@ -1238,7 +1179,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                           </th>
                         ))}
 
-                        {/* Sub-header keterangan absen kanan */}
                         {keteranganColumns.map((ket) => (
                           <th
                             key={ket}
@@ -1262,10 +1202,8 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
 
                           return (
                             <tr key={pegawai.id}>
-                              {/* Nama */}
                               <td className="pegawai-name-cell">{pegawai.nama_pegawai}</td>
 
-                              {/* Nilai free text per metode */}
                               {allMetode.map((m) => {
                                 const key = cellKey(pegawai.id, m.id);
                                 const val = getNilaiCell(pegawai.id, m.id);
@@ -1277,10 +1215,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                                       value={val}
                                       placeholder="-"
                                       onChange={(e) =>
-                                        setDraftNilai((prev) => ({
-                                          ...prev,
-                                          [key]: e.target.value,
-                                        }))
+                                        setDraftNilai((prev) => ({ ...prev, [key]: e.target.value }))
                                       }
                                       onBlur={() => saveNilaiCell(pegawai.id, m.id)}
                                     />
@@ -1288,7 +1223,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                                 );
                               })}
 
-                              {/* Checkbox keterangan (radio-style: 1 pilihan) */}
                               {keteranganColumns.map((ket) => {
                                 const checked = currentKet === ket;
 
@@ -1299,12 +1233,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                                         type="checkbox"
                                         className="hidden-checkbox"
                                         checked={checked}
-                                        onChange={() =>
-                                          setKeteranganPegawai(
-                                            pegawai.id,
-                                            checked ? null : ket
-                                          )
-                                        }
+                                        onChange={() => setKeteranganPegawai(pegawai.id, checked ? null : ket)}
                                       />
                                       <div
                                         className={`custom-checkbox ${checked ? "checked" : ""}`}
@@ -1317,9 +1246,7 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
                                             : {}
                                         }
                                       >
-                                        {checked && (
-                                          <Check size={14} color="white" strokeWidth={3} />
-                                        )}
+                                        {checked && <Check size={14} color="white" strokeWidth={3} />}
                                       </div>
                                     </label>
                                   </td>
@@ -1340,7 +1267,6 @@ export default function KegiatanPage({ pegawaiList, refreshPegawai }: Props) {
               )}
             </div>
 
-            {/* FOOTER MODAL */}
             <div className="modal-footer">
               <button className="btn-primary" onClick={closeKelola}>
                 <Save size={16} /> Selesai
