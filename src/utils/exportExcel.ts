@@ -20,6 +20,14 @@ interface ExportRekapParams {
   absensiKeteranganData?: AbsensiKeterangan[];
   keteranganColumns?: KeteranganAbsen[];
   isKegiatanMode?: boolean;
+  
+  // INFO KEGIATAN
+  kegiatanInfo?: {
+    instruktur?: string | null;
+    asisten?: string | null;
+    pejabat?: string | null;
+    materi?: string | null;
+  } | null;
 }
 
 type RekapItem = {
@@ -153,9 +161,6 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// HELPER: GROUP KOLOM BY KATEGORI
-// ═══════════════════════════════════════════════════════════════
 function groupKolomByKategori(kolomList: KolomAbsen[]) {
   const map = new Map<string, KolomAbsen[]>();
   for (const k of kolomList) {
@@ -165,9 +170,6 @@ function groupKolomByKategori(kolomList: KolomAbsen[]) {
   return map;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CONVERT NUMBER TO COLUMN LETTER
-// ═══════════════════════════════════════════════════════════════
 function getColumnLetter(colNumber: number): string {
   let letter = "";
   while (colNumber > 0) {
@@ -178,9 +180,6 @@ function getColumnLetter(colNumber: number): string {
   return letter;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// MAIN EXPORT FUNCTION
-// ═══════════════════════════════════════════════════════════════
 export async function exportToExcel({
   pegawaiList,
   absenList,
@@ -195,7 +194,18 @@ export async function exportToExcel({
   absensiKeteranganData = [],
   keteranganColumns = [],
   isKegiatanMode = false,
+  kegiatanInfo = null,
 }: ExportRekapParams) {
+  
+  console.log("📊 Export Excel Started:", {
+    isKegiatanMode,
+    kolomAbsenList: kolomAbsenList.length,
+    absensiData: absensiData.length,
+    keteranganColumns: keteranganColumns.length,
+    pegawaiList: pegawaiList.length,
+    kegiatanInfo,
+  });
+
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Rekap Absen");
 
@@ -204,13 +214,15 @@ export async function exportToExcel({
   worksheet.pageSetup.paperSize = 9;
   worksheet.pageSetup.fitToPage = true;
 
-  // ═══════════════════════════════════════════════════════════════
-  // HITUNG STRUKTUR KOLOM
-  // ═══════════════════════════════════════════════════════════════
   const groupedKolom = groupKolomByKategori(kolomAbsenList);
   const allMetode = [...groupedKolom.values()].flat();
   
-  const baseColumns = 4; // NO, NO, NAMA, NIP
+  console.log("📋 Grouped Kolom:", {
+    categories: Array.from(groupedKolom.keys()),
+    totalMetode: allMetode.length,
+  });
+
+  const baseColumns = 4;
   const penilaianColumns = allMetode.length;
   const keteranganColumnsCount = keteranganColumns.length;
   
@@ -218,28 +230,24 @@ export async function exportToExcel({
 
   if (isKegiatanMode && (penilaianColumns > 0 || keteranganColumnsCount > 0)) {
     totalColumns = baseColumns + penilaianColumns + keteranganColumnsCount;
+    console.log("✅ Mode Kegiatan - Total Columns:", totalColumns);
   } else {
-    totalColumns = 12; // Standard mode
+    totalColumns = 12;
+    console.log("✅ Mode Harian - Total Columns:", totalColumns);
   }
 
   const lastColumnLetter = getColumnLetter(totalColumns);
 
-  // ═══════════════════════════════════════════════════════════════
-  // SET COLUMN WIDTHS
-  // ═══════════════════════════════════════════════════════════════
-  const columnWidths: number[] = [6, 6, 40, 24]; // NO, NO, NAMA, NIP
+  const columnWidths: number[] = [6, 6, 40, 24];
 
   if (isKegiatanMode) {
-    // Width untuk kolom penilaian
     for (let i = 0; i < penilaianColumns; i++) {
       columnWidths.push(15);
     }
-    // Width untuk kolom keterangan
     for (let i = 0; i < keteranganColumnsCount; i++) {
       columnWidths.push(12);
     }
   } else {
-    // Standard mode
     columnWidths.push(10, 14, 14, 9, 9, 9, 9, 18);
   }
 
@@ -259,7 +267,6 @@ export async function exportToExcel({
     right: { style: "thin", color: { argb: GREEN } },
   };
 
-  // LOGO
   const logoBase64 = await imageUrlToBase64(logoBsn);
   if (logoBase64) {
     const imageId = workbook.addImage({
@@ -274,7 +281,6 @@ export async function exportToExcel({
     });
   }
 
-  // JUDUL
   worksheet.mergeCells(`A4:${lastColumnLetter}4`);
   worksheet.getCell("A4").value = kegiatanLabel.toUpperCase();
   worksheet.getCell("A4").font = {
@@ -300,11 +306,11 @@ export async function exportToExcel({
   };
 
   worksheet.mergeCells(`A6:${lastColumnLetter}6`);
-  const bulanTahun = new Date(tanggalMulai).toLocaleDateString("id-ID", {
-    month: "long",
-    year: "numeric",
-  });
-  worksheet.getCell("A6").value = `TANGGAL: ${new Date(tanggalMulai).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+  worksheet.getCell("A6").value = `TANGGAL: ${new Date(tanggalMulai).toLocaleDateString("id-ID", { 
+    day: "numeric", 
+    month: "long", 
+    year: "numeric" 
+  })}`;
   worksheet.getCell("A6").font = {
     bold: true,
     size: 13,
@@ -315,10 +321,53 @@ export async function exportToExcel({
     vertical: "middle",
   };
 
-  // HARI KERJA (hanya untuk mode harian)
+  // ═══════════════════════════════════════════════════════════════
+  // INFO KEGIATAN (Instruktur, Asisten, Pejabat, Materi)
+  // ═══════════════════════════════════════════════════════════════
+  let currentRow = 8;
+
+  if (isKegiatanMode && kegiatanInfo) {
+    const infoStyles: Record<string, string> = {
+      "Instruktur": "FFE3F2FD",
+      "Asisten": "FFF3E5F5",
+      "Pejabat yang Mengetahui": "FFFFF3E0",
+      "Materi": "FFF1F8E9",
+    };
+
+    const infoItems = [
+      { label: "Instruktur", value: kegiatanInfo.instruktur },
+      { label: "Asisten", value: kegiatanInfo.asisten },
+      { label: "Pejabat yang Mengetahui", value: kegiatanInfo.pejabat },
+      { label: "Materi", value: kegiatanInfo.materi },
+    ];
+
+    for (const item of infoItems) {
+      if (item.value) {
+        worksheet.mergeCells(`A${currentRow}:${lastColumnLetter}${currentRow}`);
+        const cell = worksheet.getCell(`A${currentRow}`);
+        cell.value = `${item.label}: ${item.value}`;
+        cell.font = { 
+          bold: item.label !== "Materi", 
+          size: 11, 
+          color: { argb: BLACK } 
+        };
+        cell.alignment = { horizontal: "left", vertical: "middle" };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: infoStyles[item.label] || "FFF8F9FA" },
+        };
+        applyBorder(cell);
+        currentRow++;
+      }
+    }
+
+    currentRow++;
+  }
+
   if (!isKegiatanMode) {
-    worksheet.mergeCells(`A8:${lastColumnLetter}8`);
-    const hariCell = worksheet.getCell("A8");
+    worksheet.mergeCells(`A${currentRow}:${lastColumnLetter}${currentRow}`);
+    const hariCell = worksheet.getCell(`A${currentRow}`);
     hariCell.value = `HARI KERJA : ${hariKerja} HARI`;
     hariCell.font = {
       bold: true,
@@ -335,9 +384,9 @@ export async function exportToExcel({
       vertical: "middle",
     };
     applyBorder(hariCell);
+    currentRow++;
   }
 
-  let currentRow = isKegiatanMode ? 8 : 9;
   let nomorGlobal = 1;
 
   // ═══════════════════════════════════════════════════════════════
@@ -354,21 +403,18 @@ export async function exportToExcel({
 
     if (list.length === 0) continue;
 
-    // ═══════════════════════════════════════════════════════════════
-    // HEADER TABEL (2-Level untuk mode kegiatan)
-    // ═══════════════════════════════════════════════════════════════
+    console.log(`📦 Processing cluster: ${cluster} (${list.length} pegawai)`);
+
     if (isKegiatanMode && (penilaianColumns > 0 || keteranganColumnsCount > 0)) {
       
-      // ─────────────────────────────────────────────────────────────
-      // ROW 1: KATEGORI (dengan merge per kategori) + "ABSEN"
-      // ─────────────────────────────────────────────────────────────
+      console.log("🎨 Creating 2-level header...");
+      
       const headerRow1 = worksheet.getRow(currentRow);
       
-      // Merge kolom base (NO, NO, NAMA, NIP) - rowspan 2
-      worksheet.mergeCells(currentRow, 1, currentRow + 1, 1); // NO
-      worksheet.mergeCells(currentRow, 2, currentRow + 1, 2); // NO
-      worksheet.mergeCells(currentRow, 3, currentRow + 1, 3); // NAMA
-      worksheet.mergeCells(currentRow, 4, currentRow + 1, 4); // NIP
+      worksheet.mergeCells(currentRow, 1, currentRow + 1, 1);
+      worksheet.mergeCells(currentRow, 2, currentRow + 1, 2);
+      worksheet.mergeCells(currentRow, 3, currentRow + 1, 3);
+      worksheet.mergeCells(currentRow, 4, currentRow + 1, 4);
 
       const noCell1 = worksheet.getCell(currentRow, 1);
       const noCell2 = worksheet.getCell(currentRow, 2);
@@ -387,12 +433,12 @@ export async function exportToExcel({
 
       let colIndex = 5;
 
-      // Kategori penilaian dengan merge horizontal
       for (const [kategori, methods] of groupedKolom.entries()) {
         const startCol = colIndex;
         const endCol = colIndex + methods.length - 1;
 
-        // Merge kategori
+        console.log(`  📌 Category: ${kategori} (cols ${startCol}-${endCol})`);
+
         if (methods.length > 1) {
           worksheet.mergeCells(currentRow, startCol, currentRow, endCol);
         }
@@ -401,20 +447,21 @@ export async function exportToExcel({
         cell.value = kategori.toUpperCase();
         styleHeader(cell, SOFT_GRAY, BLACK);
 
-        // Style cells yang di-merge juga
         if (methods.length > 1) {
           for (let c = startCol + 1; c <= endCol; c++) {
-            styleHeader(worksheet.getCell(currentRow, c), SOFT_GRAY, BLACK);
+            const mergedCell = worksheet.getCell(currentRow, c);
+            styleHeader(mergedCell, SOFT_GRAY, BLACK);
           }
         }
 
         colIndex = endCol + 1;
       }
 
-      // Header "ABSEN" dengan merge
       if (keteranganColumnsCount > 0) {
         const startCol = colIndex;
         const endCol = colIndex + keteranganColumnsCount - 1;
+
+        console.log(`  📌 ABSEN section (cols ${startCol}-${endCol})`);
 
         if (keteranganColumnsCount > 1) {
           worksheet.mergeCells(currentRow, startCol, currentRow, endCol);
@@ -424,10 +471,10 @@ export async function exportToExcel({
         cell.value = "ABSEN";
         styleHeader(cell, LIGHT_BLUE, "FF0369A1");
 
-        // Style cells yang di-merge
         if (keteranganColumnsCount > 1) {
           for (let c = startCol + 1; c <= endCol; c++) {
-            styleHeader(worksheet.getCell(currentRow, c), LIGHT_BLUE, "FF0369A1");
+            const mergedCell = worksheet.getCell(currentRow, c);
+            styleHeader(mergedCell, LIGHT_BLUE, "FF0369A1");
           }
         }
       }
@@ -435,13 +482,9 @@ export async function exportToExcel({
       headerRow1.height = 28;
       currentRow++;
 
-      // ─────────────────────────────────────────────────────────────
-      // ROW 2: SUB-HEADER (METODE + KETERANGAN)
-      // ─────────────────────────────────────────────────────────────
       const headerRow2 = worksheet.getRow(currentRow);
       colIndex = 5;
 
-      // Sub-header per metode
       for (const metode of allMetode) {
         const cell = headerRow2.getCell(colIndex);
         
@@ -452,14 +495,19 @@ export async function exportToExcel({
         
         cell.value = cellValue;
         styleHeader(cell, YELLOW, BLACK);
+        
+        console.log(`    ✏️ Metode col ${colIndex}: ${metode.metode}`);
+        
         colIndex++;
       }
 
-      // Sub-header keterangan
       for (const ket of keteranganColumns) {
         const cell = headerRow2.getCell(colIndex);
         cell.value = ket;
         styleHeader(cell, BLUE, "FFFFFFFF");
+        
+        console.log(`    ✅ Keterangan col ${colIndex}: ${ket}`);
+        
         colIndex++;
       }
 
@@ -467,9 +515,7 @@ export async function exportToExcel({
       currentRow++;
 
     } else {
-      // ─────────────────────────────────────────────────────────────
-      // STANDARD HEADER (1 ROW) - MODE HARIAN
-      // ─────────────────────────────────────────────────────────────
+      
       const headerRow = worksheet.getRow(currentRow);
       const headers = [
         "NO",
@@ -496,19 +542,15 @@ export async function exportToExcel({
       currentRow++;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // DATA ROWS
-    // ═══════════════════════════════════════════════════════════════
     let nomorCluster = 1;
 
     if (isKegiatanMode && (penilaianColumns > 0 || keteranganColumnsCount > 0)) {
-      // ─────────────────────────────────────────────────────────────
-      // MODE KEGIATAN: Nilai Penilaian + Keterangan
-      // ─────────────────────────────────────────────────────────────
+      
+      console.log("💾 Writing data rows (mode kegiatan)...");
+      
       list.forEach((pegawai) => {
         const row = worksheet.getRow(currentRow);
 
-        // Kolom base
         row.getCell(1).value = nomorGlobal;
         row.getCell(2).value = nomorCluster;
         row.getCell(3).value = pegawai.nama_pegawai;
@@ -521,7 +563,6 @@ export async function exportToExcel({
 
         let colIndex = 5;
 
-        // Nilai penilaian per metode
         for (const metode of allMetode) {
           const absensiRecord = absensiData.find(
             (a) => a.pegawai_id === pegawai.id && a.kolom_absen_id === metode.id
@@ -532,10 +573,14 @@ export async function exportToExcel({
           const cell = row.getCell(colIndex);
           cell.value = nilai;
           styleBody(cell, "center");
+          
+          if (absensiRecord) {
+            console.log(`      📝 ${pegawai.nama_pegawai} - ${metode.metode}: ${nilai}`);
+          }
+          
           colIndex++;
         }
 
-        // Keterangan absen (checkbox sebagai ✓)
         const keteranganRecord = absensiKeteranganData.find(
           (a) => a.pegawai_id === pegawai.id
         );
@@ -555,9 +600,9 @@ export async function exportToExcel({
       });
 
     } else {
-      // ─────────────────────────────────────────────────────────────
-      // MODE HARIAN: Rekap Statistik
-      // ─────────────────────────────────────────────────────────────
+      
+      console.log("💾 Writing data rows (mode harian)...");
+      
       const rekap = buildRekap(list, absenList);
 
       rekap.forEach((item) => {
@@ -638,25 +683,40 @@ export async function exportToExcel({
   // ═══════════════════════════════════════════════════════════════
   // FREEZE PANES
   // ═══════════════════════════════════════════════════════════════
-  const freezeRow = isKegiatanMode ? (penilaianColumns > 0 || keteranganColumnsCount > 0 ? 10 : 9) : 9;
+  let freezeRowCount = 9;
+
+  if (isKegiatanMode && kegiatanInfo) {
+    const infoCount = [
+      kegiatanInfo.instruktur,
+      kegiatanInfo.asisten,
+      kegiatanInfo.pejabat,
+      kegiatanInfo.materi,
+    ].filter(Boolean).length;
+
+    freezeRowCount = 8 + infoCount + 1 + 2;
+  }
+
   worksheet.views = [
     {
       state: "frozen",
-      ySplit: freezeRow,
-      xSplit: 4, // Freeze 4 kolom pertama
+      ySplit: freezeRowCount,
+      xSplit: 4,
     },
   ];
 
   // ═══════════════════════════════════════════════════════════════
   // SAVE FILE
   // ═══════════════════════════════════════════════════════════════
+  console.log("💾 Saving Excel file...");
+  
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 
-  saveAs(
-    blob,
-    `Rekap_${kegiatanLabel.replace(/\s+/g, "_")}_${tanggalMulai}.xlsx`
-  );
+  const fileName = `Rekap_${kegiatanLabel.replace(/\s+/g, "_")}_${tanggalMulai}.xlsx`;
+  
+  saveAs(blob, fileName);
+  
+  console.log("✅ Export completed:", fileName);
 }

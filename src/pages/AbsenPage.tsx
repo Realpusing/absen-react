@@ -142,6 +142,8 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   };
 
   const fetchKolomAbsen = async (kegiatanId: number) => {
+    console.log("🔍 Fetching kolom absen untuk kegiatan:", kegiatanId);
+    
     const { data, error } = await supabase
       .from("kolom_absen")
       .select("*")
@@ -149,13 +151,17 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       .order("urutan", { ascending: true });
 
     if (error) {
-      console.error("Gagal fetch kolom absen:", error.message);
+      console.error("❌ Error fetch kolom absen:", error.message);
       return;
     }
+    
+    console.log("✅ Kolom Absen Fetched:", data);
     setKolomAbsenList((data as KolomAbsen[]) || []);
   };
 
   const fetchAbsensiKegiatan = async (kegiatanId: number, tanggal: string) => {
+    console.log("🔍 Fetching absensi untuk kegiatan:", kegiatanId, "tanggal:", tanggal);
+    
     const { data, error } = await supabase
       .from("absensi")
       .select("*")
@@ -163,13 +169,17 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       .eq("tanggal", tanggal);
 
     if (error) {
-      console.error("Gagal fetch absensi kegiatan:", error.message);
+      console.error("❌ Error fetch absensi kegiatan:", error.message);
       return;
     }
+    
+    console.log("✅ Absensi Kegiatan Fetched:", data);
     setAbsensiKegiatanData((data as Absensi[]) || []);
   };
 
   const fetchAbsensiKeterangan = async (kegiatanId: number, tanggal: string) => {
+    console.log("🔍 Fetching absensi keterangan untuk kegiatan:", kegiatanId);
+    
     const { data, error } = await supabase
       .from("absensi_keterangan")
       .select("*")
@@ -177,9 +187,11 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       .eq("tanggal", tanggal);
 
     if (error) {
-      console.error("Gagal fetch absensi keterangan:", error.message);
+      console.error("❌ Error fetch absensi keterangan:", error.message);
       return;
     }
+    
+    console.log("✅ Absensi Keterangan Fetched:", data);
     setAbsensiKeteranganList((data as AbsensiKeterangan[]) || []);
   };
 
@@ -194,21 +206,28 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   }, []);
 
   useEffect(() => {
-    if (selectedKegiatanId === null) {
-      // Absen harian
-      fetchAbsenByDate(selectedDate);
-      setKolomAbsenList([]);
-      setAbsensiKegiatanData([]);
-      setAbsensiKeteranganList([]);
-      setDraftNilai({});
-    } else {
-      // Absen kegiatan dengan kolom dinamis
-      fetchKolomAbsen(selectedKegiatanId);
-      fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
-      fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
-      setAbsenList([]);
-      setDraftNilai({});
-    }
+    const loadData = async () => {
+      if (selectedKegiatanId === null) {
+        // Absen harian
+        await fetchAbsenByDate(selectedDate);
+        setKolomAbsenList([]);
+        setAbsensiKegiatanData([]);
+        setAbsensiKeteranganList([]);
+        setDraftNilai({});
+      } else {
+        // Absen kegiatan dengan kolom dinamis
+        await Promise.all([
+          fetchKolomAbsen(selectedKegiatanId),
+          fetchAbsensiKegiatan(selectedKegiatanId, selectedDate),
+          fetchAbsensiKeterangan(selectedKegiatanId, selectedDate),
+        ]);
+        
+        setAbsenList([]);
+        setDraftNilai({});
+      }
+    };
+
+    loadData();
   }, [selectedDate, selectedKegiatanId]);
 
   // ══════════════════════════════════════════════════════════════
@@ -547,6 +566,41 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   };
 
   const confirmExportExcel = () => {
+    // Debug log
+    console.log("🔍 Export Debug:", {
+      isKegiatanMode: selectedKegiatanId !== null,
+      selectedKegiatanId,
+      kolomAbsenList: kolomAbsenList.length,
+      absensiKegiatanData: absensiKegiatanData.length,
+      keteranganColumns: keteranganColumns.length,
+      allMetode: allMetode.length,
+    });
+
+    // ✅ Prepare kegiatan info
+    let kegiatanInfo = null;
+    if (selectedKegiatanId !== null && selectedKegiatan) {
+      const instrukturNama = selectedKegiatan.instruktur_id 
+        ? pegawaiList.find(p => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai 
+        : null;
+      
+      const asistenNama = selectedKegiatan.asisten_id 
+        ? pegawaiList.find(p => p.id === selectedKegiatan.asisten_id)?.nama_pegawai 
+        : null;
+      
+      const pejabatNama = selectedKegiatan.pejabat_id 
+        ? pegawaiList.find(p => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai 
+        : null;
+
+      kegiatanInfo = {
+        instruktur: instrukturNama,
+        asisten: asistenNama,
+        pejabat: pejabatNama,
+        materi: selectedKegiatan.materi,
+      };
+
+      console.log("📋 Kegiatan Info:", kegiatanInfo);
+    }
+
     exportToExcel({
       pegawaiList: absenPegawaiList,
       absenList: filteredAbsen,
@@ -559,6 +613,16 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       penanggungJawab,
       jabatanPenanggungJawab,
       hariKerja: 22,
+      
+      // DATA KEGIATAN
+      kolomAbsenList: selectedKegiatanId !== null ? kolomAbsenList : [],
+      absensiData: selectedKegiatanId !== null ? absensiKegiatanData : [],
+      absensiKeteranganData: selectedKegiatanId !== null ? absensiKeteranganList : [],
+      keteranganColumns: selectedKegiatanId !== null ? keteranganColumns : [],
+      isKegiatanMode: selectedKegiatanId !== null,
+      
+      // ✅ INFO KEGIATAN
+      kegiatanInfo,
     });
 
     setShowExportModal(false);
