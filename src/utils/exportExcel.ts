@@ -185,7 +185,7 @@ export async function exportToExcel({
   absenList,
   kegiatanLabel,
   tanggalMulai,
-  tanggalSelesai: _tanggalSelesai,  // ✅ Prefix _ untuk ignore TypeScript warning
+  tanggalSelesai: _tanggalSelesai,
   penanggungJawab,
   jabatanPenanggungJawab,
   hariKerja = 22,
@@ -267,6 +267,7 @@ export async function exportToExcel({
     right: { style: "thin", color: { argb: GREEN } },
   };
 
+  // ✅ LOGO DI TENGAH PERSIS
   const logoBase64 = await imageUrlToBase64(logoBsn);
   if (logoBase64) {
     const imageId = workbook.addImage({
@@ -274,9 +275,9 @@ export async function exportToExcel({
       extension: "png",
     });
 
-    const logoCol = totalColumns / 2 - 0.5;
+    const logoCol = (totalColumns / 2) - 1;
     worksheet.addImage(imageId, {
-      tl: { col: logoCol, row: 0.12 },
+      tl: { col: logoCol, row: 0.2 },
       ext: { width: 58, height: 58 },
     });
   }
@@ -322,18 +323,11 @@ export async function exportToExcel({
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // INFO KEGIATAN (Instruktur, Asisten, Pejabat, Materi)
+  // ✅ INFO KEGIATAN (POLOS TANPA WARNA)
   // ═══════════════════════════════════════════════════════════════
   let currentRow = 8;
 
   if (isKegiatanMode && kegiatanInfo) {
-    const infoStyles: Record<string, string> = {
-      "Instruktur": "FFE3F2FD",
-      "Asisten": "FFF3E5F5",
-      "Pejabat yang Mengetahui": "FFFFF3E0",
-      "Materi": "FFF1F8E9",
-    };
-
     const infoItems = [
       { label: "Instruktur", value: kegiatanInfo.instruktur },
       { label: "Asisten", value: kegiatanInfo.asisten },
@@ -352,11 +346,6 @@ export async function exportToExcel({
           color: { argb: BLACK } 
         };
         cell.alignment = { horizontal: "left", vertical: "middle" };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: infoStyles[item.label] || "FFF8F9FA" },
-        };
         applyBorder(cell);
         currentRow++;
       }
@@ -681,28 +670,8 @@ export async function exportToExcel({
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // FREEZE PANES
+  // ✅ TANPA FREEZE PANES (dihapus)
   // ═══════════════════════════════════════════════════════════════
-  let freezeRowCount = 9;
-
-  if (isKegiatanMode && kegiatanInfo) {
-    const infoCount = [
-      kegiatanInfo.instruktur,
-      kegiatanInfo.asisten,
-      kegiatanInfo.pejabat,
-      kegiatanInfo.materi,
-    ].filter(Boolean).length;
-
-    freezeRowCount = 8 + infoCount + 1 + 2;
-  }
-
-  worksheet.views = [
-    {
-      state: "frozen",
-      ySplit: freezeRowCount,
-      xSplit: 4,
-    },
-  ];
 
   // ═══════════════════════════════════════════════════════════════
   // SAVE FILE
