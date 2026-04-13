@@ -12,7 +12,6 @@ import {
   XCircle,
   Check,
   Table as TableIcon,
-  Layers,
 } from "lucide-react";
 import { supabase } from "../supabase";
 import type {
