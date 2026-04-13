@@ -15,15 +15,6 @@ export type KeteranganAbsen =
   | "Alpha";
 
 // ══════════════════════════════════════════════════════════════
-// METODE PENILAIAN (untuk kolom dinamis)
-// ══════════════════════════════════════════════════════════════
-
-export interface MetodePenilaian {
-  nama: string;   // "Push Up", "Lari 2.4 KM", "Pull Up"
-  satuan: string; // "rep/menit", "meter", "detik"
-}
-
-// ══════════════════════════════════════════════════════════════
 // PEGAWAI
 // ══════════════════════════════════════════════════════════════
 
@@ -39,7 +30,7 @@ export interface Pegawai {
   nik_pimpinan_langsung?: string | null;
   nip_pimpinan_langsung?: string | null;
   cluster: ClusterType;
-  urutan: number;
+  urutan?: number | null;
   created_at?: string;
 }
 
@@ -69,6 +60,7 @@ export interface Kegiatan {
   asisten_id?: number | null;
   pejabat_id?: number | null;
   materi?: string | null;
+  keterangan_columns?: KeteranganAbsen[] | null; // ✅ TAMBAH: kolom ABSEN yang dipilih
   created_at?: string;
 }
 
@@ -84,16 +76,19 @@ export interface KegiatanPegawai {
 }
 
 // ══════════════════════════════════════════════════════════════
-// KOLOM ABSEN - Kolom Dinamis dengan Banyak Metode (Tabel: kolom_absen)
+// KOLOM ABSEN - Kolom Dinamis (Tabel: kolom_absen)
 // ══════════════════════════════════════════════════════════════
 
 export interface KolomAbsen {
   id: number;
   kegiatan_id: number;
   nama_kategori: string;           // "Kebugaran Fisik", "Tes Psikologi"
-  metode_list: MetodePenilaian[];  // Array: [{ nama: "Push Up", satuan: "rep/menit" }, ...]
+  metode?: string | null;          // ✅ FIXED: "Push Up", "Lari 2.4 KM" (single metode per row)
+  satuan?: string | null;          // ✅ FIXED: "rep/menit", "meter", "detik"
   urutan: number;
   created_at?: string;
+  keterangan_dipilih?: string[] | null;  // Legacy (jika masih dipakai)
+  metode_list?: any;               // Legacy JSONB (jika masih dipakai)
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -105,10 +100,11 @@ export interface Absensi {
   kegiatan_id: number;
   pegawai_id: number;
   kolom_absen_id: number;
-  nama_metode: string;  // "Push Up", "Lari 2.4 KM", dll
-  nilai: string;        // Input bebas: "1400", "45", "A", dll
+  nilai: string;              // Input bebas: "50", "12:30", "A", dll
   tanggal: string;
   keterangan?: string | null;
+  sub_kolom?: string | null;  // ✅ TAMBAH: untuk unique constraint
+  nama_metode?: string | null; // ✅ TAMBAH: untuk unique constraint
   created_at?: string;
 }
 
@@ -120,7 +116,7 @@ export interface AbsensiKeterangan {
   id: number;
   kegiatan_id: number;
   pegawai_id: number;
-  keterangan: KeteranganAbsen; // Hadir, Alpha, Dinas Luar, Lepas Piket, dll
+  keterangan: string; // ✅ FIXED: string biasa (akan di-cast ke KeteranganAbsen saat dipakai)
   tanggal: string;
   created_at?: string;
 }
