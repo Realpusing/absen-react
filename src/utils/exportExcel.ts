@@ -518,6 +518,7 @@ export async function exportToExcel({
         "SAKIT",
         "ALPA",
         "IZIN",
+        "LEPAS PIKET",
         "TOTAL KEHADIRAN",
       ];
 
