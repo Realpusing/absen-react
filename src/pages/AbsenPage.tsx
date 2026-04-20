@@ -13,6 +13,7 @@ import {
   Check,
   Table as TableIcon,
 } from "lucide-react";
+import Swal from "sweetalert2";
 import { supabase } from "../supabase";
 import type {
   Pegawai,
@@ -376,7 +377,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       
     } catch (error: any) {
       console.error("❌ Error pada handleCheckAbsen:", error);
-      alert(`Gagal menyimpan absen: ${error.message || 'Unknown error'}`);
+      
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Menyimpan",
+        text: error.message || "Terjadi kesalahan saat menyimpan absen",
+        confirmButtonColor: "#3b82f6",
+      });
     }
   };
 
@@ -411,7 +418,20 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       // Hapus jika kosong
       if (existing) {
         const { error } = await supabase.from("absensi").delete().eq("id", existing.id);
-        if (error) { console.error("Gagal hapus nilai:", error.message); return; }
+        if (error) { 
+          console.error("Gagal hapus nilai:", error.message);
+          Swal.fire({
+            icon: "error",
+            title: "Gagal Hapus",
+            text: error.message,
+            confirmButtonColor: "#3b82f6",
+            toast: true,
+            position: "top-end",
+            timer: 3000,
+            showConfirmButton: false,
+          });
+          return;
+        }
         await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
       }
       return;
@@ -429,8 +449,18 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     );
 
     if (error) { 
-      console.error("Gagal simpan nilai:", error.message); 
-      return; 
+      console.error("Gagal simpan nilai:", error.message);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Simpan",
+        text: error.message,
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      return;
     }
 
     await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
@@ -463,7 +493,20 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
           .from("absensi_keterangan")
           .delete()
           .eq("id", existing.id);
-        if (error) { console.error("Gagal hapus keterangan:", error.message); return; }
+        if (error) { 
+          console.error("Gagal hapus keterangan:", error.message);
+          Swal.fire({
+            icon: "error",
+            title: "Gagal Hapus",
+            text: error.message,
+            confirmButtonColor: "#3b82f6",
+            toast: true,
+            position: "top-end",
+            timer: 3000,
+            showConfirmButton: false,
+          });
+          return;
+        }
       }
       await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
       return;
@@ -479,7 +522,20 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       { onConflict: "kegiatan_id,pegawai_id,tanggal" }
     );
 
-    if (error) { console.error("Gagal simpan keterangan:", error.message); return; }
+    if (error) { 
+      console.error("Gagal simpan keterangan:", error.message);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Simpan",
+        text: error.message,
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      return;
+    }
 
     await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
   };
@@ -495,34 +551,49 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     const clusterPegawai = filteredPegawai.filter((p) => p.cluster === cluster);
 
     if (clusterPegawai.length === 0) {
-      alert(`Tidak ada pegawai di cluster ${cluster}`);
+      Swal.fire({
+        icon: "warning",
+        title: "Tidak Ada Pegawai",
+        text: `Tidak ada pegawai di cluster ${cluster}`,
+        confirmButtonColor: "#3b82f6",
+      });
       return;
     }
 
+    const pegawaiIds = clusterPegawai.map((p) => p.id);
+    const existingRows = filteredAbsen.filter((a) => pegawaiIds.includes(a.pegawai_id));
+
+    // ✅ OPTIMISTIC UPDATE: Update UI dulu sebelum BE
+    const optimisticAbsen: Absen[] = clusterPegawai.map((pegawai) => ({
+      id: Math.random(), // temporary ID
+      pegawai_id: pegawai.id,
+      tanggal: selectedDate,
+      keterangan,
+      kegiatan_id: selectedKegiatanId,
+    }));
+
+    // Update state langsung (Optimistic)
+    setAbsenList((prev) => {
+      const filtered = prev.filter((a) => !pegawaiIds.includes(a.pegawai_id));
+      return [...filtered, ...optimisticAbsen];
+    });
+
+    // Show loading indicator
     setBulkLoadingCluster(cluster);
 
     try {
-      const pegawaiIds = clusterPegawai.map((p) => p.id);
-
-      const existingRows = filteredAbsen.filter((a) =>
-        pegawaiIds.includes(a.pegawai_id)
-      );
-
+      // Hapus data lama jika ada
       if (existingRows.length > 0) {
         const idsToDelete = existingRows.map((a) => a.id);
-
         const { error: deleteError } = await supabase
           .from("absen")
           .delete()
           .in("id", idsToDelete);
 
-        if (deleteError) {
-          alert("Gagal hapus data lama: " + deleteError.message);
-          setBulkLoadingCluster(null);
-          return;
-        }
+        if (deleteError) throw deleteError;
       }
 
+      // Insert data baru
       const payload = clusterPegawai.map((pegawai) => ({
         pegawai_id: pegawai.id,
         tanggal: selectedDate,
@@ -530,56 +601,128 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         kegiatan_id: selectedKegiatanId,
       }));
 
-      const { error: insertError } = await supabase
-        .from("absen")
-        .insert(payload);
+      const { error: insertError } = await supabase.from("absen").insert(payload);
 
-      if (insertError) {
-        alert("Gagal set absen cluster: " + insertError.message);
-        setBulkLoadingCluster(null);
-        return;
-      }
+      if (insertError) throw insertError;
 
+      // ✅ Refresh dari server untuk sinkronisasi
       await fetchAbsenByDate(selectedDate);
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: `${clusterPegawai.length} pegawai cluster ${cluster} berhasil di-set ${keterangan}`,
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      
+    } catch (error: any) {
+      console.error("Error bulk set absen:", error);
+      
+      // ❌ Rollback optimistic update jika gagal
+      await fetchAbsenByDate(selectedDate);
+      
+      Swal.fire({
+        icon: "error",
+        title: "Gagal!",
+        text: error.message || "Gagal set absen cluster",
+        confirmButtonColor: "#3b82f6",
+      });
     } finally {
       setBulkLoadingCluster(null);
     }
   };
 
+  // ██████████████████████████████████████████████████████████████
+  // ✅ PERBAIKAN: KOSONGKAN SEMUA CHECKBOX CLUSTER
+  // ██████████████████████████████████████████████████████████████
   const clearClusterAbsen = async (cluster: ClusterType) => {
     const clusterPegawai = filteredPegawai.filter((p) => p.cluster === cluster);
-    if (clusterPegawai.length === 0) return;
+    if (clusterPegawai.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "Tidak Ada Pegawai",
+        text: `Tidak ada pegawai di cluster ${cluster}`,
+        confirmButtonColor: "#3b82f6",
+      });
+      return;
+    }
 
-    const ok = window.confirm(`Yakin hapus semua absen cluster ${cluster}?`);
-    if (!ok) return;
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Kosongkan Checkbox",
+      text: `Yakin ingin mengosongkan semua checkbox cluster ${cluster}?`,
+      showCancelButton: true,
+      confirmButtonColor: "#f59e0b",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Ya, Kosongkan!",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) return;
+
+    const pegawaiIds = clusterPegawai.map((p) => p.id);
+    const rowsToDelete = filteredAbsen.filter((a) => pegawaiIds.includes(a.pegawai_id));
+
+    if (rowsToDelete.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "Tidak Ada Data",
+        text: "Tidak ada checkbox yang tercentang untuk dihapus",
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      return;
+    }
+
+    // ✅ OPTIMISTIC UPDATE - Hapus dari UI langsung
+    setAbsenList((prev) => prev.filter((a) => !pegawaiIds.includes(a.pegawai_id)));
 
     setBulkLoadingCluster(cluster);
 
     try {
-      const pegawaiIds = clusterPegawai.map((p) => p.id);
-      const rowsToDelete = filteredAbsen.filter((a) =>
-        pegawaiIds.includes(a.pegawai_id)
-      );
-
-      if (rowsToDelete.length === 0) {
-        setBulkLoadingCluster(null);
-        return;
-      }
-
       const idsToDelete = rowsToDelete.map((a) => a.id);
-
+      
+      // Hapus dari database
       const { error } = await supabase
         .from("absen")
         .delete()
         .in("id", idsToDelete);
 
-      if (error) {
-        alert("Gagal hapus absen cluster: " + error.message);
-        setBulkLoadingCluster(null);
-        return;
-      }
+      if (error) throw error;
 
+      // Refresh untuk sinkronisasi
       await fetchAbsenByDate(selectedDate);
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil Dikosongkan!",
+        text: `${rowsToDelete.length} checkbox cluster ${cluster} berhasil dikosongkan`,
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      
+    } catch (error: any) {
+      console.error("Error clear cluster:", error);
+      
+      // ❌ Rollback jika gagal
+      await fetchAbsenByDate(selectedDate);
+      
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Dikosongkan!",
+        text: error.message || "Gagal mengosongkan checkbox cluster",
+        confirmButtonColor: "#3b82f6",
+      });
     } finally {
       setBulkLoadingCluster(null);
     }
@@ -647,43 +790,87 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       console.log("📋 Kegiatan Info:", kegiatanInfo);
     }
 
-    exportToExcel({
-      pegawaiList: absenPegawaiList,
-      absenList: filteredAbsen,
-      kegiatanLabel:
-        selectedKegiatanId === null
-          ? "Rekap Absen Apel"
-          : selectedKegiatan?.nama_kegiatan || "Rekap Absen",
-      tanggalMulai: exportTanggalMulai,
-      tanggalSelesai: exportTanggalSelesai,
-      penanggungJawab,
-      jabatanPenanggungJawab,
-      hariKerja: 22,
-      
-      // DATA KEGIATAN
-      kolomAbsenList: selectedKegiatanId !== null ? kolomAbsenList : [],
-      absensiData: selectedKegiatanId !== null ? absensiKegiatanData : [],
-      absensiKeteranganData: selectedKegiatanId !== null ? absensiKeteranganList : [],
-      keteranganColumns: selectedKegiatanId !== null ? keteranganColumns : [],
-      isKegiatanMode: selectedKegiatanId !== null,
-      
-      // ✅ INFO KEGIATAN
-      kegiatanInfo,
-    });
+    try {
+      exportToExcel({
+        pegawaiList: absenPegawaiList,
+        absenList: filteredAbsen,
+        kegiatanLabel:
+          selectedKegiatanId === null
+            ? "Rekap Absen Apel"
+            : selectedKegiatan?.nama_kegiatan || "Rekap Absen",
+        tanggalMulai: exportTanggalMulai,
+        tanggalSelesai: exportTanggalSelesai,
+        penanggungJawab,
+        jabatanPenanggungJawab,
+        hariKerja: 22,
+        
+        // DATA KEGIATAN
+        kolomAbsenList: selectedKegiatanId !== null ? kolomAbsenList : [],
+        absensiData: selectedKegiatanId !== null ? absensiKegiatanData : [],
+        absensiKeteranganData: selectedKegiatanId !== null ? absensiKeteranganList : [],
+        keteranganColumns: selectedKegiatanId !== null ? keteranganColumns : [],
+        isKegiatanMode: selectedKegiatanId !== null,
+        
+        // ✅ INFO KEGIATAN
+        kegiatanInfo,
+      });
 
-    setShowExportModal(false);
+      setShowExportModal(false);
+
+      Swal.fire({
+        icon: "success",
+        title: "Export Berhasil!",
+        text: "File Excel berhasil didownload",
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      
+    } catch (error: any) {
+      console.error("Export error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Export Gagal!",
+        text: error.message || "Terjadi kesalahan saat export",
+        confirmButtonColor: "#3b82f6",
+      });
+    }
   };
 
   const handleExportPDF = () => {
-    exportToPDF({
-      absenPegawaiList,
-      getAbsenStatus,
-      selectedDate,
-      kegiatanLabel:
-        selectedKegiatanId === null
-          ? "Absensi Harian"
-          : selectedKegiatan?.nama_kegiatan || "Kegiatan",
-    });
+    try {
+      exportToPDF({
+        absenPegawaiList,
+        getAbsenStatus,
+        selectedDate,
+        kegiatanLabel:
+          selectedKegiatanId === null
+            ? "Absensi Harian"
+            : selectedKegiatan?.nama_kegiatan || "Kegiatan",
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Export Berhasil!",
+        text: "File PDF berhasil didownload",
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      
+    } catch (error: any) {
+      console.error("Export PDF error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Export Gagal!",
+        text: error.message || "Terjadi kesalahan saat export PDF",
+        confirmButtonColor: "#3b82f6",
+      });
+    }
   };
 
   // ══════════════════════════════════════════════════════════════
@@ -882,7 +1069,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => bulkSetAbsenByCluster(cluster, "Hadir")}
                     >
-                      ✅ Semua Hadir
+                      {bulkLoadingCluster === cluster ? "⏳" : "✅"} Semua Hadir
                     </button>
 
                     <button
@@ -890,7 +1077,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => bulkSetAbsenByCluster(cluster, "Izin")}
                     >
-                      🟡 Semua Izin
+                      {bulkLoadingCluster === cluster ? "⏳" : "🟡"} Semua Izin
                     </button>
 
                     <button
@@ -898,15 +1085,16 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => bulkSetAbsenByCluster(cluster, "Alpha")}
                     >
-                      🔴 Semua Alpha
+                      {bulkLoadingCluster === cluster ? "⏳" : "🔴"} Semua Alpha
                     </button>
 
                     <button
                       className="bulk-btn bulk-btn-clear"
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => clearClusterAbsen(cluster)}
+                      style={{ background: "#fbbf24", color: "#78350f" }}
                     >
-                      ❌ Hapus Cluster
+                      {bulkLoadingCluster === cluster ? "⏳" : "✕"} Kosongkan
                     </button>
                   </div>
 
