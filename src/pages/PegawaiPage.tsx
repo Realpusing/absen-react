@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus, Edit2, Trash2, Save } from "lucide-react";
+import { UserPlus, Edit2, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import { supabase } from "../supabase";
 import { clusterOptions, clusterConfig, initialPegawaiForm } from "../constants";
@@ -184,44 +184,50 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
     setEditPegawaiId(null);
   };
 
-  const handleUrutanInput = (pegawaiId: number, value: string) => {
+  // ██████████████████████████████████████████████████████████████
+  // ✅ AUTO-SAVE URUTAN (LANGSUNG SAAT INPUT BERUBAH)
+  // ██████████████████████████████████████████████████████████████
+  const handleUrutanInput = async (pegawaiId: number, value: string) => {
+    const newUrutan = Number(value) || 0;
+
+    // ✅ UPDATE STATE DULU (UNTUK UI)
     setEditedUrutan((prev) => ({
       ...prev,
-      [pegawaiId]: Number(value) || 0,
+      [pegawaiId]: newUrutan,
     }));
-  };
 
-  // ██████████████████████████████████████████████████████████████
-  // ✅ PERBAIKAN: SAVE URUTAN YANG BENAR
-  // ██████████████████████████████████████████████████████████████
-  const saveUrutan = async (pegawaiId: number) => {
-    // Ambil nilai dari state editedUrutan, bukan defaultValue
-    const urutan = editedUrutan[pegawaiId];
-
-    if (urutan === undefined) {
-      Swal.fire({
-        icon: "warning",
-        title: "Urutan Kosong",
-        text: "Masukkan nilai urutan terlebih dahulu",
-        confirmButtonColor: "#3b82f6",
-      });
-      return;
-    }
-
+    // ✅ SHOW LOADING
     setLoadingSaveUrutan(pegawaiId);
 
     try {
+      console.log(`📤 Saving urutan: pegawaiId=${pegawaiId}, urutan=${newUrutan}`);
+
+      // ✅ SAVE KE DATABASE
       const { error } = await supabase
         .from("pegawai")
-        .update({ urutan })
+        .update({ urutan: newUrutan })
         .eq("id", pegawaiId);
 
       if (error) throw error;
 
+      console.log(`✅ Urutan berhasil disimpan: ${newUrutan}`);
+
+      // ✅ REFRESH DATA
+      await refreshPegawai();
+
+      // ✅ CLEAR STATE SETELAH BERHASIL
+      setEditedUrutan((prev) => {
+        const updated = { ...prev };
+        delete updated[pegawaiId];
+        return updated;
+      });
+    } catch (error: any) {
+      console.error("❌ Error:", error);
+
       Swal.fire({
-        icon: "success",
-        title: "Berhasil!",
-        text: `Urutan berhasil diperbarui menjadi ${urutan}`,
+        icon: "error",
+        title: "Gagal Simpan!",
+        text: error.message || "Terjadi kesalahan saat menyimpan urutan",
         confirmButtonColor: "#3b82f6",
         toast: true,
         position: "top-end",
@@ -229,20 +235,11 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
         showConfirmButton: false,
       });
 
-      // Clear edited urutan state
+      // ✅ ROLLBACK UI
       setEditedUrutan((prev) => {
         const updated = { ...prev };
         delete updated[pegawaiId];
         return updated;
-      });
-
-      await refreshPegawai();
-    } catch (error: any) {
-      Swal.fire({
-        icon: "error",
-        title: "Gagal Simpan!",
-        text: error.message || "Terjadi kesalahan saat menyimpan urutan",
-        confirmButtonColor: "#3b82f6",
       });
     } finally {
       setLoadingSaveUrutan(null);
@@ -251,16 +248,20 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
 
   return (
     <div className="page">
+      {/* ── HEADER ── */}
       <div className="glass page-header-card">
         <div className="header-top">
           <div>
             <h1 className="page-title">Kelola Pegawai</h1>
-            <p className="page-subtitle">Tambah, edit, hapus, dan atur urutan pegawai secara bebas</p>
+            <p className="page-subtitle">
+              Tambah, edit, hapus, dan atur urutan pegawai secara bebas
+            </p>
           </div>
           <UserPlus size={48} color="#3b82f6" />
         </div>
       </div>
 
+      {/* ── FORM TAMBAH/EDIT ── */}
       <div className="glass">
         <h2 className="section-title">
           {editPegawaiId ? "✏️ Edit Pegawai" : "➕ Tambah Pegawai"}
@@ -268,80 +269,80 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
 
         <form onSubmit={submitPegawai}>
           <div className="form-grid">
-            <input 
-              type="text" 
-              name="nama_pegawai" 
-              placeholder="Nama Pegawai *" 
-              value={pegawaiForm.nama_pegawai} 
-              onChange={handlePegawaiChange} 
-              required 
-              className="form-input" 
+            <input
+              type="text"
+              name="nama_pegawai"
+              placeholder="Nama Pegawai *"
+              value={pegawaiForm.nama_pegawai}
+              onChange={handlePegawaiChange}
+              required
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="nip" 
-              placeholder="NIP *" 
-              value={pegawaiForm.nip} 
-              onChange={handlePegawaiChange} 
-              required 
-              className="form-input" 
+            <input
+              type="text"
+              name="nip"
+              placeholder="NIP *"
+              value={pegawaiForm.nip}
+              onChange={handlePegawaiChange}
+              required
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="nik" 
-              placeholder="NIK *" 
-              value={pegawaiForm.nik} 
-              onChange={handlePegawaiChange} 
-              required 
-              className="form-input" 
+            <input
+              type="text"
+              name="nik"
+              placeholder="NIK *"
+              value={pegawaiForm.nik}
+              onChange={handlePegawaiChange}
+              required
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="jabatan" 
-              placeholder="Jabatan" 
-              value={pegawaiForm.jabatan} 
-              onChange={handlePegawaiChange} 
-              className="form-input" 
+            <input
+              type="text"
+              name="jabatan"
+              placeholder="Jabatan"
+              value={pegawaiForm.jabatan}
+              onChange={handlePegawaiChange}
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="golongan_pangkat" 
-              placeholder="Golongan/Pangkat" 
-              value={pegawaiForm.golongan_pangkat} 
-              onChange={handlePegawaiChange} 
-              className="form-input" 
+            <input
+              type="text"
+              name="golongan_pangkat"
+              placeholder="Golongan/Pangkat"
+              value={pegawaiForm.golongan_pangkat}
+              onChange={handlePegawaiChange}
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="jenjang_jabatan" 
-              placeholder="Jenjang Jabatan" 
-              value={pegawaiForm.jenjang_jabatan} 
-              onChange={handlePegawaiChange} 
-              className="form-input" 
+            <input
+              type="text"
+              name="jenjang_jabatan"
+              placeholder="Jenjang Jabatan"
+              value={pegawaiForm.jenjang_jabatan}
+              onChange={handlePegawaiChange}
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="nama_pimpinan_langsung" 
-              placeholder="Nama Pimpinan Langsung" 
-              value={pegawaiForm.nama_pimpinan_langsung} 
-              onChange={handlePegawaiChange} 
-              className="form-input" 
+            <input
+              type="text"
+              name="nama_pimpinan_langsung"
+              placeholder="Nama Pimpinan Langsung"
+              value={pegawaiForm.nama_pimpinan_langsung}
+              onChange={handlePegawaiChange}
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="nik_pimpinan_langsung" 
-              placeholder="NIK Pimpinan Langsung" 
-              value={pegawaiForm.nik_pimpinan_langsung} 
-              onChange={handlePegawaiChange} 
-              className="form-input" 
+            <input
+              type="text"
+              name="nik_pimpinan_langsung"
+              placeholder="NIK Pimpinan Langsung"
+              value={pegawaiForm.nik_pimpinan_langsung}
+              onChange={handlePegawaiChange}
+              className="form-input"
             />
-            <input 
-              type="text" 
-              name="nip_pimpinan_langsung" 
-              placeholder="NIP Pimpinan Langsung" 
-              value={pegawaiForm.nip_pimpinan_langsung} 
-              onChange={handlePegawaiChange} 
-              className="form-input" 
+            <input
+              type="text"
+              name="nip_pimpinan_langsung"
+              placeholder="NIP Pimpinan Langsung"
+              value={pegawaiForm.nip_pimpinan_langsung}
+              onChange={handlePegawaiChange}
+              className="form-input"
             />
 
             <select
@@ -380,6 +381,7 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
         </form>
       </div>
 
+      {/* ── TABEL PEGAWAI PER CLUSTER ── */}
       {clusterOptions.map((cluster) => {
         const cfg = clusterConfig[cluster];
         const Icon = cfg.icon;
@@ -393,14 +395,23 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
           <div key={cluster} className="cluster-section">
             <div
               className="cluster-header"
-              style={{ background: cfg.bg, borderLeft: `4px solid ${cfg.color}` }}
+              style={{
+                background: cfg.bg,
+                borderLeft: `4px solid ${cfg.color}`,
+              }}
             >
               <div className="cluster-header-left">
-                <div className="cluster-header-icon" style={{ background: cfg.gradient }}>
+                <div
+                  className="cluster-header-icon"
+                  style={{ background: cfg.gradient }}
+                >
                   <Icon size={20} color="white" />
                 </div>
                 <div>
-                  <h3 className="cluster-header-title" style={{ color: cfg.color }}>
+                  <h3
+                    className="cluster-header-title"
+                    style={{ color: cfg.color }}
+                  >
                     {cluster}
                   </h3>
                   <p className="cluster-header-count">{list.length} pegawai</p>
@@ -414,14 +425,13 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Urutan</th>
+                      <th>Urutan (Auto-Save)</th>
                       <th>Nama</th>
                       <th>NIP</th>
                       <th>NIK</th>
                       <th>Jabatan</th>
                       <th>Gol/Pangkat</th>
                       <th>Cluster</th>
-                      <th>Simpan</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
@@ -430,21 +440,62 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                       <tr key={item.id}>
                         <td>{index + 1}</td>
                         <td>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={editedUrutan[item.id] !== undefined ? editedUrutan[item.id] : (item.urutan ?? 0)}
-                            onChange={(e) => handleUrutanInput(item.id, e.target.value)}
-                            className="urutan-input"
-                            style={{
-                              padding: "6px 8px",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "6px",
-                              width: "80px",
-                              textAlign: "center",
-                            }}
-                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={
+                                editedUrutan[item.id] !== undefined
+                                  ? editedUrutan[item.id]
+                                  : item.urutan ?? 0
+                              }
+                              onChange={(e) =>
+                                handleUrutanInput(item.id, e.target.value)
+                              }
+                              disabled={loadingSaveUrutan === item.id}
+                              className="urutan-input"
+                              style={{
+                                padding: "8px 10px",
+                                border:
+                                  loadingSaveUrutan === item.id
+                                    ? "2px solid #3b82f6"
+                                    : "1px solid #e5e7eb",
+                                borderRadius: "6px",
+                                width: "90px",
+                                textAlign: "center",
+                                fontWeight: "600",
+                                fontSize: "14px",
+                                opacity: loadingSaveUrutan === item.id ? 0.7 : 1,
+                                transition: "all 0.2s ease",
+                                cursor:
+                                  loadingSaveUrutan === item.id
+                                    ? "not-allowed"
+                                    : "text",
+                              }}
+                            />
+                            {loadingSaveUrutan === item.id ? (
+                              <span
+                                style={{
+                                  color: "#3b82f6",
+                                  fontWeight: "bold",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                ⏳
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  color: "#10b981",
+                                  fontWeight: "bold",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                ✓
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="td-nama-bold">{item.nama_pegawai}</td>
                         <td>{item.nip}</td>
@@ -455,10 +506,16 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                           <select
                             value={item.cluster}
                             onChange={(e) =>
-                              changeCluster(item.id, e.target.value as ClusterType)
+                              changeCluster(
+                                item.id,
+                                e.target.value as ClusterType
+                              )
                             }
                             className="cluster-select"
-                            style={{ borderColor: cfg.color, color: cfg.color }}
+                            style={{
+                              borderColor: cfg.color,
+                              color: cfg.color,
+                            }}
                           >
                             {clusterOptions.map((c) => (
                               <option key={c} value={c}>
@@ -468,32 +525,22 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                           </select>
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className="btn-save-order"
-                            onClick={() => saveUrutan(item.id)}
-                            disabled={loadingSaveUrutan === item.id}
-                            style={{
-                              opacity: loadingSaveUrutan === item.id ? 0.6 : 1,
-                              cursor: loadingSaveUrutan === item.id ? "not-allowed" : "pointer",
-                            }}
-                          >
-                            {loadingSaveUrutan === item.id ? "⏳" : <Save size={16} />}
-                          </button>
-                        </td>
-                        <td>
                           <div className="action-group">
-                            <button 
+                            <button
                               type="button"
-                              className="btn-edit" 
+                              className="btn-edit"
                               onClick={() => editPegawai(item)}
+                              title="Edit pegawai"
                             >
                               <Edit2 size={16} />
                             </button>
-                            <button 
+                            <button
                               type="button"
-                              className="btn-delete" 
-                              onClick={() => deletePegawai(item.id, item.nama_pegawai)}
+                              className="btn-delete"
+                              onClick={() =>
+                                deletePegawai(item.id, item.nama_pegawai)
+                              }
+                              title="Hapus pegawai"
                             >
                               <Trash2 size={16} />
                             </button>
