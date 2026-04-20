@@ -292,45 +292,92 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   const handleCheckAbsen = async (pegawaiId: number, ket: KeteranganAbsen) => {
     const existing = filteredAbsen.find((a) => a.pegawai_id === pegawaiId);
 
-    if (existing) {
-      if (existing.keterangan === ket) {
-        const { error } = await supabase
-          .from("absen")
-          .delete()
-          .eq("id", existing.id);
+    try {
+      if (existing) {
+        if (existing.keterangan === ket) {
+          // Hapus absen jika klik yang sama (uncheck)
+          const { error } = await supabase
+            .from("absen")
+            .delete()
+            .eq("id", existing.id);
 
-        if (error) {
-          alert("Gagal hapus absen: " + error.message);
-          return;
+          if (error) throw error;
+        } else {
+          // Update keterangan
+          const { error } = await supabase
+            .from("absen")
+            .update({ keterangan: ket })
+            .eq("id", existing.id);
+
+          if (error) {
+            // ✅ Jika gagal update, coba hapus lalu insert baru
+            console.warn("Update gagal, mencoba insert ulang...", error);
+            
+            const { error: deleteError } = await supabase
+              .from("absen")
+              .delete()
+              .eq("id", existing.id);
+              
+            if (deleteError) throw deleteError;
+
+            const { error: insertError } = await supabase.from("absen").insert([
+              {
+                pegawai_id: pegawaiId,
+                tanggal: selectedDate,
+                keterangan: ket,
+                kegiatan_id: selectedKegiatanId,
+              },
+            ]);
+
+            if (insertError) throw insertError;
+          }
         }
       } else {
-        const { error } = await supabase
-          .from("absen")
-          .update({ keterangan: ket })
-          .eq("id", existing.id);
+        // Insert absen baru
+        const { error } = await supabase.from("absen").insert([
+          {
+            pegawai_id: pegawaiId,
+            tanggal: selectedDate,
+            keterangan: ket,
+            kegiatan_id: selectedKegiatanId,
+          },
+        ]);
 
         if (error) {
-          alert("Gagal update absen: " + error.message);
-          return;
+          // ✅ Cek apakah error karena duplicate
+          if (error.code === '23505') { // PostgreSQL unique violation
+            console.warn("Data sudah ada, mencoba update...");
+            
+            // Cari record yang conflict
+            const { data: conflictData } = await supabase
+              .from("absen")
+              .select("*")
+              .eq("pegawai_id", pegawaiId)
+              .eq("tanggal", selectedDate)
+              .eq("kegiatan_id", selectedKegiatanId)
+              .maybeSingle();
+
+            if (conflictData) {
+              const { error: updateError } = await supabase
+                .from("absen")
+                .update({ keterangan: ket })
+                .eq("id", conflictData.id);
+                
+              if (updateError) throw updateError;
+            }
+          } else {
+            throw error;
+          }
         }
       }
-    } else {
-      const { error } = await supabase.from("absen").insert([
-        {
-          pegawai_id: pegawaiId,
-          tanggal: selectedDate,
-          keterangan: ket,
-          kegiatan_id: selectedKegiatanId,
-        },
-      ]);
 
-      if (error) {
-        alert("Gagal tambah absen: " + error.message);
-        return;
-      }
+      // Refresh data
+      await fetchAbsenByDate(selectedDate);
+      
+    } catch (error: any) {
+      console.error("❌ Error pada handleCheckAbsen:", error);
+      alert(`Gagal menyimpan absen: ${error.message || 'Unknown error'}`);
     }
-
-    fetchAbsenByDate(selectedDate);
   };
 
   // ══════════════════════════════════════════════════════════════
