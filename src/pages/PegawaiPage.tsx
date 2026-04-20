@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { UserPlus, Edit2, Trash2, Save } from "lucide-react";
+import Swal from "sweetalert2";
 import { supabase } from "../supabase";
 import { clusterOptions, clusterConfig, initialPegawaiForm } from "../constants";
 import type { Pegawai, ClusterType } from "../types";
@@ -13,6 +14,7 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
   const [pegawaiForm, setPegawaiForm] = useState(initialPegawaiForm);
   const [editPegawaiId, setEditPegawaiId] = useState<number | null>(null);
   const [editedUrutan, setEditedUrutan] = useState<Record<number, number>>({});
+  const [loadingSaveUrutan, setLoadingSaveUrutan] = useState<number | null>(null);
 
   const handlePegawaiChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -28,32 +30,62 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
     e.preventDefault();
 
     if (!pegawaiForm.nama_pegawai || !pegawaiForm.nip || !pegawaiForm.nik) {
-      alert("Nama, NIP, dan NIK wajib diisi");
+      Swal.fire({
+        icon: "warning",
+        title: "Data Tidak Lengkap",
+        text: "Nama, NIP, dan NIK wajib diisi",
+        confirmButtonColor: "#3b82f6",
+      });
       return;
     }
 
-    if (editPegawaiId) {
-      const { error } = await supabase
-        .from("pegawai")
-        .update(pegawaiForm)
-        .eq("id", editPegawaiId);
+    try {
+      if (editPegawaiId) {
+        const { error } = await supabase
+          .from("pegawai")
+          .update(pegawaiForm)
+          .eq("id", editPegawaiId);
 
-      if (error) {
-        alert("Gagal update: " + error.message);
-        return;
-      }
-    } else {
-      const { error } = await supabase.from("pegawai").insert([pegawaiForm]);
+        if (error) throw error;
 
-      if (error) {
-        alert("Gagal tambah: " + error.message);
-        return;
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Data pegawai berhasil diperbarui",
+          confirmButtonColor: "#3b82f6",
+          toast: true,
+          position: "top-end",
+          timer: 3000,
+          showConfirmButton: false,
+        });
+      } else {
+        const { error } = await supabase.from("pegawai").insert([pegawaiForm]);
+
+        if (error) throw error;
+
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Pegawai berhasil ditambahkan",
+          confirmButtonColor: "#3b82f6",
+          toast: true,
+          position: "top-end",
+          timer: 3000,
+          showConfirmButton: false,
+        });
       }
+
+      setPegawaiForm(initialPegawaiForm);
+      setEditPegawaiId(null);
+      await refreshPegawai();
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Gagal!",
+        text: error.message || "Terjadi kesalahan",
+        confirmButtonColor: "#3b82f6",
+      });
     }
-
-    setPegawaiForm(initialPegawaiForm);
-    setEditPegawaiId(null);
-    refreshPegawai();
   };
 
   const editPegawai = (item: Pegawai) => {
@@ -75,32 +107,76 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const deletePegawai = async (id: number) => {
-    const ok = window.confirm("Yakin hapus pegawai ini?");
-    if (!ok) return;
+  const deletePegawai = async (id: number, nama: string) => {
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Hapus Pegawai?",
+      text: `Yakin ingin menghapus ${nama}? Tindakan ini tidak dapat dibatalkan.`,
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    });
 
-    const { error } = await supabase.from("pegawai").delete().eq("id", id);
+    if (!result.isConfirmed) return;
 
-    if (error) {
-      alert("Gagal hapus: " + error.message);
-      return;
+    try {
+      const { error } = await supabase.from("pegawai").delete().eq("id", id);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil Dihapus!",
+        text: `${nama} berhasil dihapus`,
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+
+      await refreshPegawai();
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Hapus!",
+        text: error.message || "Terjadi kesalahan",
+        confirmButtonColor: "#3b82f6",
+      });
     }
-
-    refreshPegawai();
   };
 
   const changeCluster = async (id: number, cluster: ClusterType) => {
-    const { error } = await supabase
-      .from("pegawai")
-      .update({ cluster })
-      .eq("id", id);
+    try {
+      const { error } = await supabase
+        .from("pegawai")
+        .update({ cluster })
+        .eq("id", id);
 
-    if (error) {
-      alert("Gagal ubah cluster: " + error.message);
-      return;
+      if (error) throw error;
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Cluster berhasil diubah",
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      await refreshPegawai();
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Gagal!",
+        text: error.message || "Terjadi kesalahan",
+        confirmButtonColor: "#3b82f6",
+      });
     }
-
-    refreshPegawai();
   };
 
   const cancelEdit = () => {
@@ -111,29 +187,66 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
   const handleUrutanInput = (pegawaiId: number, value: string) => {
     setEditedUrutan((prev) => ({
       ...prev,
-      [pegawaiId]: Number(value),
+      [pegawaiId]: Number(value) || 0,
     }));
   };
 
+  // ██████████████████████████████████████████████████████████████
+  // ✅ PERBAIKAN: SAVE URUTAN YANG BENAR
+  // ██████████████████████████████████████████████████████████████
   const saveUrutan = async (pegawaiId: number) => {
+    // Ambil nilai dari state editedUrutan, bukan defaultValue
     const urutan = editedUrutan[pegawaiId];
 
-    if (urutan === undefined || Number.isNaN(urutan)) {
-      alert("Urutan tidak valid");
+    if (urutan === undefined) {
+      Swal.fire({
+        icon: "warning",
+        title: "Urutan Kosong",
+        text: "Masukkan nilai urutan terlebih dahulu",
+        confirmButtonColor: "#3b82f6",
+      });
       return;
     }
 
-    const { error } = await supabase
-      .from("pegawai")
-      .update({ urutan })
-      .eq("id", pegawaiId);
+    setLoadingSaveUrutan(pegawaiId);
 
-    if (error) {
-      alert("Gagal simpan urutan: " + error.message);
-      return;
+    try {
+      const { error } = await supabase
+        .from("pegawai")
+        .update({ urutan })
+        .eq("id", pegawaiId);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: `Urutan berhasil diperbarui menjadi ${urutan}`,
+        confirmButtonColor: "#3b82f6",
+        toast: true,
+        position: "top-end",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      // Clear edited urutan state
+      setEditedUrutan((prev) => {
+        const updated = { ...prev };
+        delete updated[pegawaiId];
+        return updated;
+      });
+
+      await refreshPegawai();
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Simpan!",
+        text: error.message || "Terjadi kesalahan saat menyimpan urutan",
+        confirmButtonColor: "#3b82f6",
+      });
+    } finally {
+      setLoadingSaveUrutan(null);
     }
-
-    refreshPegawai();
   };
 
   return (
@@ -155,15 +268,81 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
 
         <form onSubmit={submitPegawai}>
           <div className="form-grid">
-            <input type="text" name="nama_pegawai" placeholder="Nama Pegawai *" value={pegawaiForm.nama_pegawai} onChange={handlePegawaiChange} required className="form-input" />
-            <input type="text" name="nip" placeholder="NIP *" value={pegawaiForm.nip} onChange={handlePegawaiChange} required className="form-input" />
-            <input type="text" name="nik" placeholder="NIK *" value={pegawaiForm.nik} onChange={handlePegawaiChange} required className="form-input" />
-            <input type="text" name="jabatan" placeholder="Jabatan" value={pegawaiForm.jabatan} onChange={handlePegawaiChange} className="form-input" />
-            <input type="text" name="golongan_pangkat" placeholder="Golongan/Pangkat" value={pegawaiForm.golongan_pangkat} onChange={handlePegawaiChange} className="form-input" />
-            <input type="text" name="jenjang_jabatan" placeholder="Jenjang Jabatan" value={pegawaiForm.jenjang_jabatan} onChange={handlePegawaiChange} className="form-input" />
-            <input type="text" name="nama_pimpinan_langsung" placeholder="Nama Pimpinan Langsung" value={pegawaiForm.nama_pimpinan_langsung} onChange={handlePegawaiChange} className="form-input" />
-            <input type="text" name="nik_pimpinan_langsung" placeholder="NIK Pimpinan Langsung" value={pegawaiForm.nik_pimpinan_langsung} onChange={handlePegawaiChange} className="form-input" />
-            <input type="text" name="nip_pimpinan_langsung" placeholder="NIP Pimpinan Langsung" value={pegawaiForm.nip_pimpinan_langsung} onChange={handlePegawaiChange} className="form-input" />
+            <input 
+              type="text" 
+              name="nama_pegawai" 
+              placeholder="Nama Pegawai *" 
+              value={pegawaiForm.nama_pegawai} 
+              onChange={handlePegawaiChange} 
+              required 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="nip" 
+              placeholder="NIP *" 
+              value={pegawaiForm.nip} 
+              onChange={handlePegawaiChange} 
+              required 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="nik" 
+              placeholder="NIK *" 
+              value={pegawaiForm.nik} 
+              onChange={handlePegawaiChange} 
+              required 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="jabatan" 
+              placeholder="Jabatan" 
+              value={pegawaiForm.jabatan} 
+              onChange={handlePegawaiChange} 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="golongan_pangkat" 
+              placeholder="Golongan/Pangkat" 
+              value={pegawaiForm.golongan_pangkat} 
+              onChange={handlePegawaiChange} 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="jenjang_jabatan" 
+              placeholder="Jenjang Jabatan" 
+              value={pegawaiForm.jenjang_jabatan} 
+              onChange={handlePegawaiChange} 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="nama_pimpinan_langsung" 
+              placeholder="Nama Pimpinan Langsung" 
+              value={pegawaiForm.nama_pimpinan_langsung} 
+              onChange={handlePegawaiChange} 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="nik_pimpinan_langsung" 
+              placeholder="NIK Pimpinan Langsung" 
+              value={pegawaiForm.nik_pimpinan_langsung} 
+              onChange={handlePegawaiChange} 
+              className="form-input" 
+            />
+            <input 
+              type="text" 
+              name="nip_pimpinan_langsung" 
+              placeholder="NIP Pimpinan Langsung" 
+              value={pegawaiForm.nip_pimpinan_langsung} 
+              onChange={handlePegawaiChange} 
+              className="form-input" 
+            />
 
             <select
               name="cluster"
@@ -235,14 +414,14 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Urutan Bebas</th>
+                      <th>Urutan</th>
                       <th>Nama</th>
                       <th>NIP</th>
                       <th>NIK</th>
                       <th>Jabatan</th>
                       <th>Gol/Pangkat</th>
                       <th>Cluster</th>
-                      <th>Simpan Urutan</th>
+                      <th>Simpan</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
@@ -253,16 +432,25 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                         <td>
                           <input
                             type="number"
-                            defaultValue={item.urutan ?? 0}
+                            min="0"
+                            step="1"
+                            value={editedUrutan[item.id] !== undefined ? editedUrutan[item.id] : (item.urutan ?? 0)}
                             onChange={(e) => handleUrutanInput(item.id, e.target.value)}
                             className="urutan-input"
+                            style={{
+                              padding: "6px 8px",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "6px",
+                              width: "80px",
+                              textAlign: "center",
+                            }}
                           />
                         </td>
                         <td className="td-nama-bold">{item.nama_pegawai}</td>
                         <td>{item.nip}</td>
                         <td>{item.nik}</td>
-                        <td>{item.jabatan}</td>
-                        <td>{item.golongan_pangkat}</td>
+                        <td>{item.jabatan || "-"}</td>
+                        <td>{item.golongan_pangkat || "-"}</td>
                         <td>
                           <select
                             value={item.cluster}
@@ -281,18 +469,32 @@ export default function PegawaiPage({ pegawaiList, refreshPegawai }: Props) {
                         </td>
                         <td>
                           <button
+                            type="button"
                             className="btn-save-order"
                             onClick={() => saveUrutan(item.id)}
+                            disabled={loadingSaveUrutan === item.id}
+                            style={{
+                              opacity: loadingSaveUrutan === item.id ? 0.6 : 1,
+                              cursor: loadingSaveUrutan === item.id ? "not-allowed" : "pointer",
+                            }}
                           >
-                            <Save size={16} />
+                            {loadingSaveUrutan === item.id ? "⏳" : <Save size={16} />}
                           </button>
                         </td>
                         <td>
                           <div className="action-group">
-                            <button className="btn-edit" onClick={() => editPegawai(item)}>
+                            <button 
+                              type="button"
+                              className="btn-edit" 
+                              onClick={() => editPegawai(item)}
+                            >
                               <Edit2 size={16} />
                             </button>
-                            <button className="btn-delete" onClick={() => deletePegawai(item.id)}>
+                            <button 
+                              type="button"
+                              className="btn-delete" 
+                              onClick={() => deletePegawai(item.id, item.nama_pegawai)}
+                            >
                               <Trash2 size={16} />
                             </button>
                           </div>
