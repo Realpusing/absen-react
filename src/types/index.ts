@@ -148,3 +148,19 @@ export interface KegiatanFormData {
   pejabat_id: string;
   materi: string;
 }
+
+export type JadwalStatus = "FIX" | "TENTATIVE";
+
+export interface JadwalKhusus {
+  id: number;
+  tanggal: string; // YYYY-MM-DD
+  judul: string;
+  subjudul?: string | null;
+  status: JadwalStatus;
+  waktu_label?: string | null;
+  peserta_label?: string | null;
+  peserta?: string | null;
+  pic?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}

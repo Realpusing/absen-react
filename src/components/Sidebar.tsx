@@ -1,10 +1,19 @@
-import { Calendar, ClipboardList, Users, Menu, X } from "lucide-react";
+import {
+  Calendar,
+  ClipboardList,
+  Users,
+  Menu,
+  X,
+  CalendarDays,
+} from "lucide-react";
 import type { Pegawai } from "../types";
 import { clusterConfig, clusterOptions } from "../constants";
 
+type MenuKey = "absen" | "pegawai" | "kegiatan" | "jadwal";
+
 interface SidebarProps {
-  activeMenu: "absen" | "pegawai" | "kegiatan";
-  setActiveMenu: (menu: "absen" | "pegawai" | "kegiatan") => void;
+  activeMenu: MenuKey;
+  setActiveMenu: (menu: MenuKey) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (value: boolean) => void;
   pegawaiList: Pegawai[];
@@ -21,7 +30,10 @@ export default function Sidebar({
     <aside className={`sidebar ${sidebarOpen ? "open" : "closed"}`}>
       <div className="sidebar-header">
         {sidebarOpen && <h1 className="sidebar-logo">AbsenKu</h1>}
-        <button className="toggle-sidebar" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <button
+          className="toggle-sidebar"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+        >
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
@@ -49,6 +61,15 @@ export default function Sidebar({
         >
           <ClipboardList size={20} />
           {sidebarOpen && <span>Kelola Kegiatan</span>}
+        </button>
+
+        {/* ✅ MENU BARU */}
+        <button
+          className={`nav-item ${activeMenu === "jadwal" ? "active" : ""}`}
+          onClick={() => setActiveMenu("jadwal")}
+        >
+          <CalendarDays size={20} />
+          {sidebarOpen && <span>Jadwal Khusus</span>}
         </button>
       </nav>
 
