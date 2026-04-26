@@ -238,10 +238,11 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
   if (tvMode) {
     return (
       <div className="tvb">
-        {/* Overlay salmon */}
+  
+        {/* Overlay */}
         <div className="tvb-overlay" />
   
-        {/* Tombol Exit */}
+        {/* Exit Buttons */}
         <div className="tvb-exit">
           <button className="tvb-exit-btn" onClick={exitTvMode}>
             <Minimize2 size={16} />
@@ -252,14 +253,26 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
           </button>
         </div>
   
-        {/* ── HEADER ── */}
+        {/* ══ HEADER ══ */}
         <div className="tvb-header">
   
           {/* Logo Kiri */}
           <div className="tvb-logos">
-            <img src="/LOGO BASARNAS.png"    alt="Basarnas"  className="tvb-logo-left" />
-            <img src="/lambangBB.png"         alt="BB"        className="tvb-logo-left" />
-            <img src="/logoBasarnasTRK.png"   alt="TRK"       className="tvb-logo-left" />
+            <img
+              src="/LOGO BASARNAS.png"
+              alt="Basarnas"
+              className="tvb-logo-left"
+            />
+            <img
+              src="/lambangBB.png"
+              alt="BB"
+              className="tvb-logo-left"
+            />
+            <img
+              src="/logoBasarnasTRK.png"
+              alt="TRK"
+              className="tvb-logo-left"
+            />
           </div>
   
           {/* Judul Tengah */}
@@ -286,10 +299,12 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
   
         </div>
   
-        {/* ── LIST JADWAL ── */}
+        {/* ══ LIST ══ */}
         <div className="tvb-list">
           {tvList.length === 0 ? (
-            <div className="tvb-empty">Tidak ada jadwal upcoming.</div>
+            <div className="tvb-empty">
+              Tidak ada jadwal upcoming.
+            </div>
           ) : (
             tvList.map((it) => {
               const timeText =
@@ -304,8 +319,12 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
   
                   {/* Tanggal */}
                   <div className="tvb-date">
-                    <div className="tvb-date-day">{day2(it.tanggal)}</div>
-                    <div className="tvb-date-month">{monthUpperID(it.tanggal)}</div>
+                    <div className="tvb-date-day">
+                      {day2(it.tanggal)}
+                    </div>
+                    <div className="tvb-date-month">
+                      {monthUpperID(it.tanggal)}
+                    </div>
                   </div>
   
                   {/* Separator 1 */}
@@ -313,7 +332,9 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
   
                   {/* Center */}
                   <div className="tvb-center">
-                    <div className="tvb-center-title">{it.judul}</div>
+                    <div className="tvb-center-title">
+                      {it.judul}
+                    </div>
                     <div className="tvb-center-sub">
                       {it.subjudul || "\u00A0"}
                     </div>
@@ -325,7 +346,9 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
                       <div className="tvb-pill-icon">
                         <Clock size={20} color="white" />
                       </div>
-                      <span className="tvb-pill-text">{timeText}</span>
+                      <span className="tvb-pill-text">
+                        {timeText}
+                      </span>
                     </div>
                   </div>
   
@@ -337,7 +360,9 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
                     <div className="tvb-right-label">
                       {it.peserta_label || "PESERTA ZOOM"}
                     </div>
-                    <div className="tvb-right-value">{rightText}</div>
+                    <div className="tvb-right-value">
+                      {rightText}
+                    </div>
                   </div>
   
                 </div>
@@ -355,8 +380,8 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
                 x1="50" y1="50"
                 x2={50 + 45 * Math.cos((deg * Math.PI) / 180)}
                 y2={50 + 45 * Math.sin((deg * Math.PI) / 180)}
-                stroke="rgba(180, 30, 30, 0.65)"
-                strokeWidth="10"
+                stroke="rgba(160, 20, 20, 0.70)"
+                strokeWidth="12"
                 strokeLinecap="round"
               />
             ))}
@@ -372,8 +397,8 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
                 x1="50" y1="50"
                 x2={50 + 45 * Math.cos((deg * Math.PI) / 180)}
                 y2={50 + 45 * Math.sin((deg * Math.PI) / 180)}
-                stroke="rgba(180, 30, 30, 0.65)"
-                strokeWidth="10"
+                stroke="rgba(160, 20, 20, 0.70)"
+                strokeWidth="12"
                 strokeLinecap="round"
               />
             ))}

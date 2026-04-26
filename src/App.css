@@ -1781,7 +1781,7 @@
      ══════════════════════════════════════════════════════════════ */
   
   /* ══════════════════════════════════════════════════════════════
-   TV BOARD — PIXEL PERFECT VERSION
+   TV BOARD — PIXEL PERFECT
    ══════════════════════════════════════════════════════════════ */
 
 .tvb {
@@ -1796,19 +1796,18 @@
   font-family: "Montserrat", system-ui, sans-serif;
   display: flex;
   flex-direction: column;
-  padding: 36px 52px 40px;
-  gap: 0;
+  padding: 36px 52px 48px;
 }
 
-/* Overlay salmon/merah persis seperti gambar */
+/* Overlay salmon/merah */
 .tvb-overlay {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     155deg,
-    rgba(240, 100, 80, 0.82) 0%,
-    rgba(250, 130, 100, 0.68) 40%,
-    rgba(235, 90, 75, 0.75) 100%
+    rgba(238, 90, 70, 0.83) 0%,
+    rgba(248, 125, 95, 0.68) 45%,
+    rgba(232, 85, 68, 0.78) 100%
   );
   pointer-events: none;
   z-index: 0;
@@ -1822,8 +1821,8 @@
   left: 0;
   right: 0;
   height: 5px;
-  background: linear-gradient(90deg, #7c3aed, #a855f7, #7c3aed);
-  z-index: 2;
+  background: linear-gradient(90deg, #6d28d9, #a855f7, #6d28d9);
+  z-index: 10;
 }
 
 .tvb > * {
@@ -1831,7 +1830,7 @@
   z-index: 1;
 }
 
-/* ── EXIT BUTTON ── */
+/* ── EXIT BUTTONS ── */
 .tvb-exit {
   position: absolute;
   top: 14px;
@@ -1847,7 +1846,7 @@
   gap: 6px;
   padding: 8px 16px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.40);
   background: rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(12px);
   color: white;
@@ -1859,7 +1858,7 @@
 }
 
 .tvb-exit-btn:hover {
-  background: rgba(0, 0, 0, 0.50);
+  background: rgba(0, 0, 0, 0.55);
 }
 
 /* ── HEADER ── */
@@ -1868,48 +1867,53 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 /* Logo Kiri */
 .tvb-logos {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 
 .tvb-logo-left {
-  height: 80px;
+  height: 78px;
   object-fit: contain;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.30));
 }
 
-/* Judul Tengah */
+/* ── JUDUL TENGAH ── */
 .tvb-title {
   text-align: center;
-  line-height: 0.85;
   display: flex;
   flex-direction: column;
   align-items: center;
+  line-height: 1;
   gap: 0;
 }
 
 .tvb-title-line {
-  font-family: "Montserrat", sans-serif;
+  font-family: "Bebas Neue", "Montserrat", sans-serif;
   font-style: italic;
   font-weight: 900;
-  font-size: 68px;
-  color: #ff1f1f;
-  letter-spacing: 2px;
-  text-shadow:
-    3px 3px 0 rgba(255,255,255,0.30),
-    0 8px 24px rgba(0,0,0,0.40);
+  font-size: 80px;
+  color: #ff1a1a;
+  letter-spacing: 4px;
   display: block;
-  transform: skewX(-6deg);
-  line-height: 0.9;
+  line-height: 0.88;
+
+  /* Shadow 3D persis seperti gambar */
+  text-shadow:
+    3px  3px 0px rgba(120, 0, 0, 0.55),
+    6px  6px 0px rgba(120, 0, 0, 0.30),
+    9px  9px 0px rgba(120, 0, 0, 0.15),
+    0px  0px 30px rgba(255, 80, 80, 0.25);
+
+  transform: skewX(-8deg);
 }
 
-/* Slogan Kanan */
+/* ── SLOGAN KANAN ── */
 .tvb-slogan {
   display: flex;
   justify-content: flex-end;
@@ -1919,43 +1923,43 @@
 .tvb-slogan-logos {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
 }
 
 .tvb-slogan-logo {
   height: 52px;
   object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.20));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.20));
 }
 
 .tvb-slogan-logo.ber {
-  height: 82px;
+  height: 80px;
 }
 
 /* ── LIST JADWAL ── */
 .tvb-list {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 20px;
   flex: 1;
 }
 
 /* ── ROW / CARD ── */
 .tvb-row {
   display: grid;
-  grid-template-columns: 148px 10px 1fr 10px minmax(320px, 420px);
+  grid-template-columns: 150px 8px 1fr 8px minmax(300px, 400px);
   align-items: center;
   gap: 0;
 
-  background: rgba(255, 248, 246, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.80);
-  border-radius: 26px;
-  padding: 24px 30px;
+  background: rgba(255, 248, 246, 0.93);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 24px;
+  padding: 22px 28px;
 
   box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.22),
+    0 20px 50px rgba(0, 0, 0, 0.22),
     0 8px 16px rgba(0, 0, 0, 0.10),
-    inset 0 1px 0 rgba(255,255,255,0.95);
+    inset 0 1px 0 rgba(255, 255, 255, 1);
 
   backdrop-filter: blur(20px);
 }
@@ -1963,61 +1967,61 @@
 /* ── TANGGAL ── */
 .tvb-date {
   text-align: center;
-  padding-right: 16px;
+  padding-right: 14px;
 }
 
 .tvb-date-day {
-  font-family: "Montserrat", sans-serif;
-  font-weight: 900;
+  font-family: "Bebas Neue", sans-serif;
   font-style: italic;
-  font-size: 88px;
-  line-height: 0.85;
-  color: #ff1f1f;
-  letter-spacing: -3px;
-  text-shadow: 2px 2px 0 rgba(255,100,100,0.20);
+  font-weight: 900;
+  font-size: 96px;
+  line-height: 0.82;
+  color: #e81a1a;
+  letter-spacing: -2px;
+  text-shadow:
+    2px 2px 0px rgba(150, 0, 0, 0.40),
+    4px 4px 0px rgba(150, 0, 0, 0.20);
 }
 
 .tvb-date-month {
-  margin-top: 8px;
-  font-family: "Montserrat", sans-serif;
+  margin-top: 6px;
+  font-family: "Bebas Neue", sans-serif;
   font-weight: 900;
-  font-size: 18px;
-  color: #cc1a1a;
-  letter-spacing: 2px;
+  font-size: 22px;
+  color: #cc1515;
+  letter-spacing: 3px;
   text-transform: uppercase;
 }
 
 /* ── SEPARATOR ── */
 .tvb-sep {
   width: 6px;
-  height: 85%;
+  height: 80%;
   justify-self: center;
   background: linear-gradient(
     180deg,
-    rgba(204, 34, 34, 0.15) 0%,
-    rgba(204, 34, 34, 0.85) 30%,
-    rgba(204, 34, 34, 0.85) 70%,
-    rgba(204, 34, 34, 0.15) 100%
+    transparent 0%,
+    rgba(200, 25, 25, 0.85) 20%,
+    rgba(200, 25, 25, 0.85) 80%,
+    transparent 100%
   );
   border-radius: 6px;
 }
 
-/* ── CENTER (JUDUL KEGIATAN) ── */
+/* ── CENTER ── */
 .tvb-center {
-  padding: 0 20px 0 20px;
+  padding: 0 18px;
 }
 
 .tvb-center-title {
   font-family: "Montserrat", sans-serif;
   font-weight: 900;
-  font-size: 24px;
-  color: #cc1a1a;
+  font-size: 22px;
+  color: #cc1515;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: 0.3px;
   word-break: break-word;
-  max-width: 100%;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 
 .tvb-center-sub {
@@ -2025,43 +2029,43 @@
   font-family: "Montserrat", sans-serif;
   font-style: italic;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 17px;
   color: #1e293b;
-  min-height: 26px;
+  min-height: 24px;
   word-break: break-word;
 }
 
 /* ── PILL WAKTU ── */
 .tvb-pill {
-  margin-top: 16px;
+  margin-top: 14px;
   display: inline-flex;
   align-items: center;
   gap: 0;
-  background: #e82222;
+  background: #e01a1a;
   color: white;
   border-radius: 999px;
   overflow: hidden;
   width: fit-content;
   box-shadow:
-    0 6px 20px rgba(232, 34, 34, 0.50),
-    0 2px 6px rgba(0,0,0,0.15);
+    0 6px 20px rgba(220, 30, 30, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 .tvb-pill.tent {
-  background: #e85555;
+  background: #c94444;
   box-shadow:
-    0 6px 20px rgba(232, 85, 85, 0.45),
-    0 2px 6px rgba(0,0,0,0.12);
+    0 6px 20px rgba(200, 68, 68, 0.50),
+    0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .tvb-pill-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  background: rgba(255, 255, 255, 0.20);
-  border-right: 1px solid rgba(255, 255, 255, 0.20);
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.18);
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
   flex-shrink: 0;
 }
 
@@ -2069,28 +2073,26 @@
   font-family: "Montserrat", sans-serif;
   font-weight: 900;
   font-size: 15px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   padding: 0 20px;
   white-space: nowrap;
 }
 
-/* ── RIGHT SECTION (PESERTA) ── */
+/* ── RIGHT SECTION ── */
 .tvb-right {
-  padding: 0 0 0 20px;
+  padding: 0 0 0 18px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border-left: none;
 }
 
 .tvb-right-label {
   font-family: "Montserrat", sans-serif;
   font-weight: 900;
-  font-size: 20px;
-  color: #cc1a1a;
+  font-size: 19px;
+  color: #cc1515;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 
 .tvb-right-value {
@@ -2098,9 +2100,9 @@
   font-family: "Montserrat", sans-serif;
   font-style: italic;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 17px;
   color: #0f172a;
-  line-height: 1.5;
+  line-height: 1.55;
   opacity: 0.88;
 }
 
@@ -2108,32 +2110,32 @@
 .tvb-empty {
   padding: 28px 32px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px dashed rgba(255, 255, 255, 0.60);
+  background: rgba(255, 255, 255, 0.32);
+  border: 2px dashed rgba(255, 255, 255, 0.60);
   color: white;
   font-family: "Montserrat", sans-serif;
   font-weight: 800;
   text-align: center;
   font-size: 20px;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.20);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-/* ── ORNAMENT ── */
+/* ── ORNAMENT BINTANG ── */
 .tvb-ornament {
   position: absolute;
-  bottom: 32px;
-  left: 24px;
-  width: 110px;
-  height: 110px;
-  opacity: 0.60;
+  bottom: 28px;
+  left: 22px;
+  width: 120px;
+  height: 120px;
+  opacity: 0.65;
   pointer-events: none;
   z-index: 1;
 }
 
 .tvb-ornament.tvb-ornament-br {
   left: unset;
-  right: 24px;
-  bottom: 32px;
+  right: 22px;
+  bottom: 28px;
 }
   
   /* ══════════════════════════════════════════════════════════════
