@@ -1,0 +1,196 @@
+/* Sidebar.css */
+.sidebar-container {
+    height: 100vh;
+    background: #0f172a; /* Navy Dark */
+    color: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+  }
+  
+  .sidebar-container.open { width: 260px; }
+  .sidebar-container.closed { width: 80px; }
+  
+  /* Header */
+  .sidebar-header {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .logo-icon {
+    background: #3b82f6;
+    color: white;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 14px;
+  }
+  
+  .logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  
+  .toggle-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 6px;
+  }
+  
+  .toggle-btn:hover { background: #1e293b; color: white; }
+  
+  /* Profile Section */
+  .profile-section { padding: 0 15px 20px; }
+  .profile-card {
+    background: #1e293b;
+    padding: 12px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .profile-avatar { color: #3b82f6; }
+  .profile-info { overflow: hidden; }
+  .profile-email {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+  }
+  
+  .role-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  
+  .role-badge.admin { background: #fee2e2; color: #ef4444; }
+  .role-badge.bag_umum { background: #e0f2fe; color: #0ea5e9; }
+  .role-badge.guest { background: #f1f5f9; color: #64748b; }
+  
+  /* Navigation */
+  .nav-label {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 10px 25px;
+    letter-spacing: 1px;
+  }
+  
+  .sidebar-nav { flex: 1; padding: 0 10px; }
+  
+  .nav-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    position: relative;
+    transition: all 0.2s;
+  }
+  
+  .nav-item:hover {
+    background: #1e293b;
+    color: white;
+  }
+  
+  .nav-item.active {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .active-indicator {
+    position: absolute;
+    right: 0;
+    width: 4px;
+    height: 20px;
+    background: white;
+    border-radius: 4px 0 0 4px;
+  }
+  
+  /* Stats Section */
+  .stats-section {
+    padding: 15px 10px;
+    border-top: 1px solid #1e293b;
+  }
+  
+  .stats-list { display: flex; flex-direction: column; gap: 8px; }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 15px;
+    font-size: 13px;
+  }
+  
+  .stat-name { display: flex; align-items: center; gap: 8px; color: #94a3b8; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .stat-count { font-weight: 700; color: #f1f5f9; }
+  
+  /* Footer Logout */
+  .sidebar-footer { padding: 15px 10px; }
+  
+  .logout-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    background: #ef444415;
+    border: 1px solid #ef444430;
+    color: #f87171;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  
+  .logout-btn:hover {
+    background: #ef4444;
+    color: white;
+  }
+  
+  /* Logic for closed state */
+  .closed .nav-label,
+  .closed .profile-section,
+  .closed .stats-section,
+  .closed .nav-text {
+    display: none;
+  }
+  
+  .closed .nav-item {
+    justify-content: center;
+    padding: 15px 0;
+  }
+  
+  .closed .logout-btn {
+    justify-content: center;
+  }

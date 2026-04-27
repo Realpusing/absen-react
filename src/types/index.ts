@@ -1,3 +1,16 @@
+// src/types/index.ts
+
+// ══════════════════════════════════════════════════════════════
+// AUTH & PROFILE
+// ══════════════════════════════════════════════════════════════
+
+export interface Profile {
+  id: string;
+  email: string;
+  role: 'admin' | 'bag_umum' | 'guest';
+  created_at: string;
+}
+
 // ══════════════════════════════════════════════════════════════
 // CLUSTER & KETERANGAN
 // ══════════════════════════════════════════════════════════════
@@ -60,7 +73,8 @@ export interface Kegiatan {
   asisten_id?: number | null;
   pejabat_id?: number | null;
   materi?: string | null;
-  keterangan_columns?: KeteranganAbsen[] | null; // ✅ TAMBAH: kolom ABSEN yang dipilih
+  keterangan_columns?: string[] | null; // ✅ Array text untuk kolom ABSEN yang dipilih
+  created_by?: string | null; // ✅ TAMBAH: untuk RLS (siapa yang buat kegiatan)
   created_at?: string;
 }
 
@@ -83,8 +97,8 @@ export interface KolomAbsen {
   id: number;
   kegiatan_id: number;
   nama_kategori: string;           // "Kebugaran Fisik", "Tes Psikologi"
-  metode?: string | null;          // ✅ FIXED: "Push Up", "Lari 2.4 KM" (single metode per row)
-  satuan?: string | null;          // ✅ FIXED: "rep/menit", "meter", "detik"
+  metode?: string | null;          // "Push Up", "Lari 2.4 KM" (single metode per row)
+  satuan?: string | null;          // "rep/menit", "meter", "detik"
   urutan: number;
   created_at?: string;
   keterangan_dipilih?: string[] | null;  // Legacy (jika masih dipakai)
@@ -103,8 +117,8 @@ export interface Absensi {
   nilai: string;              // Input bebas: "50", "12:30", "A", dll
   tanggal: string;
   keterangan?: string | null;
-  sub_kolom?: string | null;  // ✅ TAMBAH: untuk unique constraint
-  nama_metode?: string | null; // ✅ TAMBAH: untuk unique constraint
+  sub_kolom?: string | null;  // untuk unique constraint
+  nama_metode?: string | null; // untuk unique constraint
   created_at?: string;
 }
 
@@ -116,9 +130,30 @@ export interface AbsensiKeterangan {
   id: number;
   kegiatan_id: number;
   pegawai_id: number;
-  keterangan: string; // ✅ FIXED: string biasa (akan di-cast ke KeteranganAbsen saat dipakai)
+  keterangan: string; // string biasa (akan di-cast ke KeteranganAbsen saat dipakai)
   tanggal: string;
   created_at?: string;
+}
+
+// ══════════════════════════════════════════════════════════════
+// JADWAL KHUSUS
+// ══════════════════════════════════════════════════════════════
+
+export type JadwalStatus = "FIX" | "TENTATIF" | "BATAL"; // ✅ Sesuai enum database
+
+export interface JadwalKhusus {
+  id: number;
+  tanggal: string; // YYYY-MM-DD
+  judul: string;
+  subjudul?: string | null;
+  status: JadwalStatus;
+  waktu_label?: string | null;
+  peserta_label: string; // NOT NULL di database
+  peserta?: string | null;
+  pic?: string | null;
+  created_by?: string | null; // ✅ TAMBAH: untuk RLS
+  created_at: string;
+  updated_at: string;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -149,18 +184,13 @@ export interface KegiatanFormData {
   materi: string;
 }
 
-export type JadwalStatus = "FIX" | "TENTATIVE";
-
-export interface JadwalKhusus {
-  id: number;
-  tanggal: string; // YYYY-MM-DD
+export interface JadwalKhususFormData {
+  tanggal: string;
   judul: string;
-  subjudul?: string | null;
+  subjudul?: string;
   status: JadwalStatus;
-  waktu_label?: string | null;
-  peserta_label?: string | null;
-  peserta?: string | null;
-  pic?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  waktu_label?: string;
+  peserta_label: string;
+  peserta?: string;
+  pic?: string;
 }

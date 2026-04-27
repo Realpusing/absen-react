@@ -2290,3 +2290,72 @@
   .cluster-section {
     animation: fadeIn 0.3s ease-out;
   }
+
+  /* Di App.css atau Sidebar.css */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.nav-item:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.nav-item.active {
+  background-color: #3b82f6;
+  color: white;
+  font-weight: 600;
+}
+
+.sidebar-clusters {
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sidebar-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.cluster-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.cluster-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.cluster-name {
+  flex: 1;
+  font-size: 13px;
+  color: #374151;
+}
+
+.cluster-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  background-color: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
