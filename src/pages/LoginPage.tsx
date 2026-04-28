@@ -1,7 +1,6 @@
-// src/pages/LoginPage.tsx
 import { useState } from 'react';
 import { supabase } from '../supabase';
-import { Mail, Lock, LogIn, Info } from 'lucide-react';
+import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react'; 
 import './LoginPage.css';
 
 interface LoginPageProps {
@@ -25,7 +24,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     });
 
     if (error) {
-      setError(error.message === "Invalid login credentials" ? "Email atau password salah!" : error.message);
+      const msg = error.message === "Invalid login credentials" 
+        ? "Email atau password salah!" 
+        : error.message;
+      setError(msg);
       setLoading(false);
     } else {
       onLogin();
@@ -33,73 +35,70 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="login-wrapper">
-      <div className="login-visual-bg" />
-      
-      <div className="login-card-modern">
-        <div className="login-brand">
-          <div className="brand-icon">SAR</div>
-          <h1 className="brand-name">Absen SAR</h1>
-          <p className="brand-tagline">Sistem Absensi & Pelaporan Terintegrasi</p>
-        </div>
+    <div className="login-page-container">
+      {/* Background Overlay */}
+      <div className="bg-overlay"></div>
+
+      <div className="login-glass-card">
+        <header className="login-brand-header">
+          <div className="brand-badge">SAR</div>
+          <h1 className="brand-title">Absen SAR</h1>
+          <p className="brand-subtitle">Kantor Pencarian & Pertolongan Makassar</p>
+        </header>
 
         {error && (
-          <div className="error-alert">
-            <Info size={18} />
+          <div className="login-error-toast">
+            <AlertCircle size={18} />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="login-form-modern">
-          <div className="input-wrapper">
-            <label>Alamat Email</label>
-            <div className="input-group-modern">
-              <Mail className="input-icon" size={20} />
+        <form onSubmit={handleLogin} className="login-modern-form">
+          <div className="form-input-wrapper">
+            <label>Email Address</label>
+            <div className="input-with-icon">
+              <Mail size={18} className="input-icon" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Masukkan email anda"
+                placeholder="Masukan email dinas"
                 required
-                disabled={loading}
               />
             </div>
           </div>
 
-          <div className="input-wrapper">
-            <label>Kata Sandi</label>
-            <div className="input-group-modern">
-              <Lock className="input-icon" size={20} />
+          <div className="form-input-wrapper">
+            <label>Password</label>
+            <div className="input-with-icon">
+              <Lock size={18} className="input-icon" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                disabled={loading}
               />
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="submit-btn-modern">
+          <button type="submit" className="login-submit-button" disabled={loading}>
             {loading ? (
-              <div className="spinner-modern" />
+              <div className="button-loader"></div>
             ) : (
               <>
-                <span>Masuk Sekarang</span>
+                <span>Masuk Sistem</span>
                 <LogIn size={20} />
               </>
             )}
           </button>
         </form>
 
-        <div className="login-helper">
-          <p>Lupa akses? <a href="#">Hubungi Admin IT</a></p>
-        </div>
-
-        {/* Info Credentials yang Lebih Rapi */}
-        <div className="demo-box">
-        </div>
+        <footer className="login-extra-footer">
+          <p>Kendala akses? <a href="#">Hubungi Bagian Umum</a></p>
+          
+          
+        </footer>
       </div>
     </div>
   );
