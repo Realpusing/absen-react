@@ -3,13 +3,8 @@ import {
   FileSpreadsheet,
   File,
   FolderOpen,
-  Calendar,
   ChevronLeft,
   ChevronRight,
-  Users,
-  CheckCircle2,
-  FileText,
-  XCircle,
   Check,
   Table as TableIcon,
 } from "lucide-react";

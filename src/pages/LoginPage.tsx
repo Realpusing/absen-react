@@ -1,7 +1,7 @@
 // src/pages/LoginPage.tsx
 import { useState } from 'react';
 import { supabase } from '../supabase';
-import { Mail, Lock, LogIn, ShieldCheck, Info } from 'lucide-react';
+import { Mail, Lock, LogIn, Info } from 'lucide-react';
 import './LoginPage.css';
 
 interface LoginPageProps {
