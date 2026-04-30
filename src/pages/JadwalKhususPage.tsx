@@ -578,7 +578,7 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
               </div>
 
               <div className="export-field">
-                <label className="export-label">Subjudul</label>
+                <label className="export-label">Dari</label>
                 <input
                   type="text"
                   value={form.subjudul}
