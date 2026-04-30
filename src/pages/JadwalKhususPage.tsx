@@ -347,7 +347,7 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
                 Tidak ada jadwal upcoming.
               </div>
             ) : (
-              tvList.map((it, idx) => {
+              tvList.map((it) => {
                 const timeText =
                   it.status === "TENTATIVE"
                     ? "TENTATIVE"
