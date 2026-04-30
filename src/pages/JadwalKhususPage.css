@@ -1,0 +1,580 @@
+/* ============================================
+   JADWAL KHUSUS - TV MODE ANIMATIONS
+   ============================================ */
+
+/* Keyframe Animations */
+@keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(50px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-15px) scale(1.05);
+    }
+  }
+  
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.1);
+    }
+  }
+  
+  @keyframes glow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(160, 20, 20, 0.3),
+                  0 0 40px rgba(160, 20, 20, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(160, 20, 20, 0.6),
+                  0 0 60px rgba(160, 20, 20, 0.4);
+    }
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -100% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  @keyframes rotate {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  @keyframes rotateReverse {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  @keyframes twinkle {
+    0%, 100% {
+      opacity: 0;
+      transform: scale(0);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  @keyframes floatingStar {
+    0% {
+      transform: translate(0, 0) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(100px, -100vh) rotate(360deg);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes wave {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    25% {
+      transform: translateY(-10px) translateX(5px);
+    }
+    75% {
+      transform: translateY(10px) translateX(-5px);
+    }
+  }
+  
+  @keyframes expandContract {
+    0%, 100% {
+      transform: scaleX(1);
+    }
+    50% {
+      transform: scaleX(1.1);
+    }
+  }
+  
+  @keyframes particle-float-1 {
+    0% {
+      transform: translate(0, 100vh) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.8;
+    }
+    90% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translate(50px, -100vh) rotate(360deg);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes particle-float-2 {
+    0% {
+      transform: translate(0, 100vh) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.6;
+    }
+    90% {
+      opacity: 0.6;
+    }
+    100% {
+      transform: translate(-30px, -100vh) rotate(-360deg);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes particle-float-3 {
+    0% {
+      transform: translate(0, 100vh) rotate(0deg) scale(0.5);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(70px, -100vh) rotate(180deg) scale(1.5);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes zigzag {
+    0%, 100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(10px);
+    }
+    75% {
+      transform: translateX(-10px);
+    }
+  }
+  
+  @keyframes blink {
+    0%, 100% { 
+      opacity: 1; 
+    }
+    50% { 
+      opacity: 0.3; 
+    }
+  }
+  
+  /* ============================================
+     TV MODE CONTAINER
+     ============================================ */
+  
+  .tvb-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+  }
+  
+  /* ============================================
+     APPLY ANIMATIONS
+     ============================================ */
+  
+  .tvb-header {
+    animation: fadeInUp 0.8s ease-out;
+  }
+  
+  .tvb-logo-left {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .tvb-logo-left:nth-child(1) {
+    animation-delay: 0s;
+  }
+  
+  .tvb-logo-left:nth-child(2) {
+    animation-delay: 0.3s;
+  }
+  
+  .tvb-logo-left:nth-child(3) {
+    animation-delay: 0.6s;
+  }
+  
+  .tvb-title {
+    animation: pulse 3s ease-in-out infinite;
+  }
+  
+  .tvb-title-line {
+    display: inline-block;
+    animation: wave 2s ease-in-out infinite;
+  }
+  
+  .tvb-title-line:nth-child(2) {
+    animation-delay: 0.3s;
+  }
+  
+  .tvb-slogan-logo {
+    animation: float 4s ease-in-out infinite;
+  }
+  
+  .tvb-slogan-logo:nth-child(2) {
+    animation-delay: 0.5s;
+  }
+  
+  .tvb-row {
+    position: relative;
+    animation: fadeInUp 0.6s ease-out backwards;
+    transition: all 0.3s ease;
+  }
+  
+  .tvb-row:nth-child(1) { animation-delay: 0.1s; }
+  .tvb-row:nth-child(2) { animation-delay: 0.2s; }
+  .tvb-row:nth-child(3) { animation-delay: 0.3s; }
+  .tvb-row:nth-child(4) { animation-delay: 0.4s; }
+  .tvb-row:nth-child(5) { animation-delay: 0.5s; }
+  .tvb-row:nth-child(6) { animation-delay: 0.6s; }
+  
+  .tvb-date {
+    animation: scaleIn 0.5s ease-out backwards, bounce 2s ease-in-out infinite 1s;
+  }
+  
+  .tvb-date-day {
+    background: linear-gradient(
+      135deg,
+      rgba(255,255,255,0.1) 0%,
+      rgba(255,255,255,0.3) 50%,
+      rgba(255,255,255,0.1) 100%
+    );
+    background-size: 200% 200%;
+    animation: shimmer 3s linear infinite;
+  }
+  
+  .tvb-pill {
+    animation: glow 2s ease-in-out infinite;
+    transition: transform 0.3s ease;
+  }
+  
+  .tvb-pill-icon {
+    animation: rotate 3s linear infinite;
+  }
+  
+  /* JUDUL TETAP PUTIH - TIDAK ADA GRADIENT KUNING */
+  .tvb-center-title {
+    color: #ff0000;
+    font-weight: bold;
+  }
+  
+  .tvb-center-sub {
+    animation: fadeInUp 1s ease-out 0.3s backwards;
+  }
+  
+  .tvb-ornament {
+    filter: drop-shadow(0 0 20px rgba(160, 20, 20, 0.6));
+  }
+  
+  .tvb-ornament-left {
+    animation: rotate 20s linear infinite;
+  }
+  
+  .tvb-ornament-right {
+    animation: rotateReverse 25s linear infinite;
+  }
+  
+  .tvb-exit-btn {
+    transition: all 0.3s ease;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  .tvb-exit-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  }
+  
+  .tvb-sep {
+    position: relative;
+    overflow: hidden;
+    animation: expandContract 3s ease-in-out infinite;
+  }
+  
+  .tvb-sep::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 215, 0, 0.5),
+      transparent
+    );
+    animation: shimmer 2s ease-in-out infinite;
+  }
+  
+  .tvb-right {
+    animation: slideInRight 0.8s ease-out;
+  }
+  
+  .tvb-right-value {
+    animation: fadeInUp 1s ease-out;
+  }
+  
+  .tvb-pill-tent {
+    animation: blink 1.5s ease-in-out infinite, glow 2s ease-in-out infinite;
+  }
+  
+  /* ============================================
+     DECORATIVE ELEMENTS
+     ============================================ */
+  
+  /* Stars */
+  .tv-star {
+    position: absolute;
+    color: #ffd700;
+    animation: twinkle 3s ease-in-out infinite;
+    pointer-events: none;
+    filter: drop-shadow(0 0 5px #ffd700);
+  }
+  
+  .tv-star-1 { top: 10%; left: 15%; animation-delay: 0s; }
+  .tv-star-2 { top: 20%; right: 20%; animation-delay: 0.5s; }
+  .tv-star-3 { bottom: 30%; left: 10%; animation-delay: 1s; }
+  .tv-star-4 { bottom: 15%; right: 15%; animation-delay: 1.5s; }
+  .tv-star-5 { top: 50%; left: 5%; animation-delay: 2s; }
+  .tv-star-6 { top: 40%; right: 8%; animation-delay: 2.5s; }
+  
+  /* Sparkles */
+  .tv-sparkle {
+    position: absolute;
+    color: #fff;
+    animation: floatingStar 15s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+  
+  .tv-sparkle:nth-child(odd) {
+    animation-duration: 12s;
+  }
+  
+  .tv-sparkle:nth-child(even) {
+    animation-duration: 18s;
+  }
+  
+  /* Floating Particles */
+  .floating-particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.8), transparent);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  
+  .particle-1 { left: 10%; animation: particle-float-1 20s linear infinite; animation-delay: 0s; }
+  .particle-2 { left: 30%; animation: particle-float-2 25s linear infinite; animation-delay: 5s; }
+  .particle-3 { left: 50%; animation: particle-float-3 22s linear infinite; animation-delay: 10s; }
+  .particle-4 { left: 70%; animation: particle-float-1 18s linear infinite; animation-delay: 15s; }
+  .particle-5 { left: 90%; animation: particle-float-2 24s linear infinite; animation-delay: 3s; }
+  .particle-6 { left: 20%; animation: particle-float-3 21s linear infinite; animation-delay: 8s; }
+  .particle-7 { left: 60%; animation: particle-float-1 19s linear infinite; animation-delay: 12s; }
+  .particle-8 { left: 80%; animation: particle-float-2 23s linear infinite; animation-delay: 6s; }
+  
+  /* Corner Decorations */
+  .corner-deco {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    border: 3px solid rgba(160, 20, 20, 0.4);
+    pointer-events: none;
+  }
+  
+  .corner-deco-tl {
+    top: 20px;
+    left: 20px;
+    border-right: none;
+    border-bottom: none;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  
+  .corner-deco-tr {
+    top: 20px;
+    right: 20px;
+    border-left: none;
+    border-bottom: none;
+    animation: pulse 3s ease-in-out infinite 0.5s;
+  }
+  
+  .corner-deco-bl {
+    bottom: 20px;
+    left: 20px;
+    border-right: none;
+    border-top: none;
+    animation: pulse 3s ease-in-out infinite 1s;
+  }
+  
+  .corner-deco-br {
+    bottom: 20px;
+    right: 20px;
+    border-left: none;
+    border-top: none;
+    animation: pulse 3s ease-in-out infinite 1.5s;
+  }
+  
+  /* Lightning */
+  .tv-lightning {
+    position: absolute;
+    color: #ffeb3b;
+    animation: twinkle 2s ease-in-out infinite, zigzag 1s ease-in-out infinite;
+    pointer-events: none;
+    filter: drop-shadow(0 0 10px #ffeb3b);
+  }
+  
+  .tv-lightning-1 {
+    top: 15%;
+    left: 25%;
+    animation-delay: 0s;
+  }
+  
+  .tv-lightning-2 {
+    top: 70%;
+    right: 25%;
+    animation-delay: 1s;
+  }
+  
+  /* Animated border for rows */
+  .tvb-row::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(
+      45deg,
+      transparent,
+      rgba(160, 20, 20, 0.3),
+      transparent
+    );
+    background-size: 200% 200%;
+    animation: shimmer 3s linear infinite;
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  
+  .tvb-row:hover::before {
+    opacity: 1;
+  }
+  
+  /* ============================================
+     ADMIN MODE HOVER EFFECTS
+     ============================================ */
+  
+  .jadwal-card2 {
+    transition: all 0.3s ease;
+  }
+  
+  .jadwal-card2:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+  }
+  
+  .jadwal-action-btn2 {
+    transition: all 0.3s ease;
+  }
+  
+  .jadwal-action-btn2:hover {
+    transform: scale(1.15) rotate(10deg);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  }
+  
+  /* ============================================
+     MODAL FIX - Prevent Selection Issues
+     ============================================ */
+  
+  .jadwal-modal {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+  }
+  
+  .jadwal-modal .form-input,
+  .jadwal-modal .form-select,
+  .jadwal-modal textarea {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    pointer-events: auto !important;
+  }
+  
+  .modal-content {
+    animation: scaleIn 0.3s ease-out;
+  }
+  
+  .form-input:focus {
+    animation: glow 0.5s ease-out;
+  }

@@ -8,9 +8,13 @@ import {
   Pencil,
   Trash2,
   Clock,
+  Star,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { supabase } from "../supabase";
 import { getTodayDate } from "../utils/helper";
+import "./JadwalKhususPage.css";
 
 type JadwalStatus = "FIX" | "TENTATIVE";
 
@@ -57,7 +61,6 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
     subjudul: "",
     status: "FIX" as JadwalStatus,
     waktu_label: "14:00 S.D 17:00 WITA",
-    peserta_label: "PESERTA ZOOM",
     peserta: "",
     pic: "",
   });
@@ -143,7 +146,6 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
       subjudul: "",
       status: "FIX",
       waktu_label: "14:00 S.D 17:00 WITA",
-      peserta_label: "PESERTA ZOOM",
       peserta: "",
       pic: "",
     });
@@ -158,7 +160,6 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
       subjudul: it.subjudul ?? "",
       status: it.status,
       waktu_label: it.waktu_label ?? "",
-      peserta_label: it.peserta_label ?? "PESERTA ZOOM",
       peserta: it.peserta ?? "",
       pic: it.pic ?? "",
     });
@@ -188,7 +189,7 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
           form.status === "TENTATIVE"
             ? "TENTATIVE"
             : form.waktu_label.trim() || null,
-        peserta_label: form.peserta_label.trim() || "PESERTA ZOOM",
+        peserta_label: "PESERTA ZOOM", // Selalu PESERTA ZOOM
         peserta: form.peserta.trim() || null,
         pic: form.pic.trim() || null,
       };
@@ -237,174 +238,215 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
   // =========================
   if (tvMode) {
     return (
-      <div className="tvb">
+      <div className="tvb-container">
+        <div className="tvb">
   
-        {/* Overlay */}
-        <div className="tvb-overlay" />
+          {/* Overlay */}
+          <div className="tvb-overlay" />
+
+          {/* Floating Stars */}
+          <div className="tv-star tv-star-1"><Star fill="#ffd700" size={24} /></div>
+          <div className="tv-star tv-star-2"><Star fill="#ffd700" size={18} /></div>
+          <div className="tv-star tv-star-3"><Star fill="#ffd700" size={20} /></div>
+          <div className="tv-star tv-star-4"><Star fill="#ffd700" size={22} /></div>
+          <div className="tv-star tv-star-5"><Star fill="#ffd700" size={16} /></div>
+          <div className="tv-star tv-star-6"><Star fill="#ffd700" size={20} /></div>
+
+          {/* Floating Sparkles */}
+          {[...Array(10)].map((_, i) => (
+            <div 
+              key={`sparkle-${i}`} 
+              className="tv-sparkle" 
+              style={{ 
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 15}s`,
+                fontSize: `${12 + Math.random() * 10}px`
+              }}
+            >
+              <Sparkles />
+            </div>
+          ))}
+
+          {/* Floating Particles */}
+          {[...Array(8)].map((_, i) => (
+            <div key={`particle-${i}`} className={`floating-particle particle-${i + 1}`} />
+          ))}
+
+          {/* Lightning Effects */}
+          <div className="tv-lightning tv-lightning-1"><Zap size={30} fill="#ffeb3b" /></div>
+          <div className="tv-lightning tv-lightning-2"><Zap size={25} fill="#ffeb3b" /></div>
+
+          {/* Corner Decorations */}
+          <div className="corner-deco corner-deco-tl" />
+          <div className="corner-deco corner-deco-tr" />
+          <div className="corner-deco corner-deco-bl" />
+          <div className="corner-deco corner-deco-br" />
   
-        {/* Exit Buttons */}
-        <div className="tvb-exit">
-          <button className="tvb-exit-btn" onClick={exitTvMode}>
-            <Minimize2 size={16} />
-            Keluar TV
-          </button>
-          <button className="tvb-exit-btn" onClick={fetchJadwal}>
-            <RefreshCw size={15} />
-          </button>
-        </div>
-  
-        {/* ══ HEADER ══ */}
-        <div className="tvb-header">
-  
-          {/* Logo Kiri */}
-          <div className="tvb-logos">
-            <img
-              src="/LOGO BASARNAS.png"
-              alt="Basarnas"
-              className="tvb-logo-left"
-            />
-            <img
-              src="/lambangBB.png"
-              alt="BB"
-              className="tvb-logo-left"
-            />
-            <img
-              src="/logoBasarnasTRK.png"
-              alt="TRK"
-              className="tvb-logo-left"
-            />
+          {/* Exit Buttons */}
+          <div className="tvb-exit">
+            <button className="tvb-exit-btn" onClick={exitTvMode}>
+              <Minimize2 size={16} />
+              Keluar TV
+            </button>
+            <button className="tvb-exit-btn" onClick={fetchJadwal}>
+              <RefreshCw size={15} />
+            </button>
           </div>
   
-          {/* Judul Tengah */}
-          <div className="tvb-title">
-            <span className="tvb-title-line">JADWAL</span>
-            <span className="tvb-title-line">PUSDATIN</span>
-          </div>
+          {/* ══ HEADER ══ */}
+          <div className="tvb-header">
   
-          {/* Logo Kanan */}
-          <div className="tvb-slogan">
-            <div className="tvb-slogan-logos">
+            {/* Logo Kiri */}
+            <div className="tvb-logos">
               <img
-                className="tvb-slogan-logo"
-                src="/White_and_Brown_Minimalist_Easter_Sale_Flyer-removebg-preview.png"
-                alt="WE ARE FAMILY"
+                src="/LOGO BASARNAS.png"
+                alt="Basarnas"
+                className="tvb-logo-left"
               />
               <img
-                className="tvb-slogan-logo ber"
-                src="/Logo_berakhlak_bangga-1-1024x390-removebg-preview.png"
-                alt="BerAKHLAK"
+                src="/lambangBB.png"
+                alt="BB"
+                className="tvb-logo-left"
+              />
+              <img
+                src="/logoBasarnasTRK.png"
+                alt="TRK"
+                className="tvb-logo-left"
               />
             </div>
+  
+            {/* Judul Tengah */}
+            <div className="tvb-title">
+              <span className="tvb-title-line">JADWAL</span>
+              <span className="tvb-title-line">PUSDATIN</span>
+            </div>
+  
+            {/* Logo Kanan */}
+            <div className="tvb-slogan">
+              <div className="tvb-slogan-logos">
+                <img
+                  className="tvb-slogan-logo"
+                  src="/White_and_Brown_Minimalist_Easter_Sale_Flyer-removebg-preview.png"
+                  alt="WE ARE FAMILY"
+                />
+                <img
+                  className="tvb-slogan-logo ber"
+                  src="/Logo_berakhlak_bangga-1-1024x390-removebg-preview.png"
+                  alt="BerAKHLAK"
+                />
+              </div>
+            </div>
+  
           </div>
   
-        </div>
+          {/* ══ LIST ══ */}
+          <div className="tvb-list">
+            {tvList.length === 0 ? (
+              <div className="tvb-empty">
+                Tidak ada jadwal upcoming.
+              </div>
+            ) : (
+              tvList.map((it, idx) => {
+                const timeText =
+                  it.status === "TENTATIVE"
+                    ? "TENTATIVE"
+                    : it.waktu_label || "-";
   
-        {/* ══ LIST ══ */}
-        <div className="tvb-list">
-          {tvList.length === 0 ? (
-            <div className="tvb-empty">
-              Tidak ada jadwal upcoming.
-            </div>
-          ) : (
-            tvList.map((it) => {
-              const timeText =
-                it.status === "TENTATIVE"
-                  ? "TENTATIVE"
-                  : it.waktu_label || "-";
+                const rightText = it.peserta || it.pic || "-";
   
-              const rightText = it.peserta || it.pic || "-";
+                return (
+                  <div key={it.id} className="tvb-row">
   
-              return (
-                <div key={it.id} className="tvb-row">
-  
-                  {/* Tanggal */}
-                  <div className="tvb-date">
-                    <div className="tvb-date-day">
-                      {day2(it.tanggal)}
-                    </div>
-                    <div className="tvb-date-month">
-                      {monthUpperID(it.tanggal)}
-                    </div>
-                  </div>
-  
-                  {/* Separator 1 */}
-                  <div className="tvb-sep" />
-  
-                  {/* Center */}
-                  <div className="tvb-center">
-                    <div className="tvb-center-title">
-                      {it.judul}
-                    </div>
-                    <div className="tvb-center-sub">
-                      {it.subjudul || "\u00A0"}
-                    </div>
-                    <div
-                      className={`tvb-pill${
-                        it.status === "TENTATIVE" ? " tent" : ""
-                      }`}
-                    >
-                      <div className="tvb-pill-icon">
-                        <Clock size={20} color="white" />
+                    {/* Tanggal */}
+                    <div className="tvb-date">
+                      <div className="tvb-date-day">
+                        {day2(it.tanggal)}
                       </div>
-                      <span className="tvb-pill-text">
-                        {timeText}
-                      </span>
+                      <div className="tvb-date-month">
+                        {monthUpperID(it.tanggal)}
+                      </div>
                     </div>
+  
+                    {/* Separator 1 */}
+                    <div className="tvb-sep" />
+  
+                    {/* Center */}
+                    <div className="tvb-center">
+                      <div className="tvb-center-title">
+                        {it.judul}
+                      </div>
+                      <div className="tvb-center-sub">
+                        {it.subjudul || "\u00A0"}
+                      </div>
+                      <div
+                        className={`tvb-pill${
+                          it.status === "TENTATIVE" ? " tvb-pill-tent" : ""
+                        }`}
+                      >
+                        <div className="tvb-pill-icon">
+                          <Clock size={20} color="white" />
+                        </div>
+                        <span className="tvb-pill-text">
+                          {timeText}
+                        </span>
+                      </div>
+                    </div>
+  
+                    {/* Separator 2 */}
+                    <div className="tvb-sep" />
+  
+                    {/* Right */}
+                    <div className="tvb-right">
+                      <div className="tvb-right-label">
+                        {it.peserta_label || "PESERTA ZOOM"}
+                      </div>
+                      <div className="tvb-right-value">
+                        {rightText}
+                      </div>
+                    </div>
+  
                   </div>
+                );
+              })
+            )}
+          </div>
   
-                  {/* Separator 2 */}
-                  <div className="tvb-sep" />
+          {/* Ornament Kiri */}
+          <div className="tvb-ornament tvb-ornament-left">
+            <svg viewBox="0 0 100 100" fill="none">
+              {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => (
+                <line
+                  key={i}
+                  x1="50" y1="50"
+                  x2={50 + 45 * Math.cos((deg * Math.PI) / 180)}
+                  y2={50 + 45 * Math.sin((deg * Math.PI) / 180)}
+                  stroke="rgba(160, 20, 20, 0.70)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
+          </div>
   
-                  {/* Right */}
-                  <div className="tvb-right">
-                    <div className="tvb-right-label">
-                      {it.peserta_label || "PESERTA ZOOM"}
-                    </div>
-                    <div className="tvb-right-value">
-                      {rightText}
-                    </div>
-                  </div>
+          {/* Ornament Kanan */}
+          <div className="tvb-ornament tvb-ornament-right">
+            <svg viewBox="0 0 100 100" fill="none">
+              {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => (
+                <line
+                  key={i}
+                  x1="50" y1="50"
+                  x2={50 + 45 * Math.cos((deg * Math.PI) / 180)}
+                  y2={50 + 45 * Math.sin((deg * Math.PI) / 180)}
+                  stroke="rgba(160, 20, 20, 0.70)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
+          </div>
   
-                </div>
-              );
-            })
-          )}
         </div>
-  
-        {/* Ornament Kiri */}
-        <div className="tvb-ornament">
-          <svg viewBox="0 0 100 100" fill="none">
-            {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => (
-              <line
-                key={i}
-                x1="50" y1="50"
-                x2={50 + 45 * Math.cos((deg * Math.PI) / 180)}
-                y2={50 + 45 * Math.sin((deg * Math.PI) / 180)}
-                stroke="rgba(160, 20, 20, 0.70)"
-                strokeWidth="12"
-                strokeLinecap="round"
-              />
-            ))}
-          </svg>
-        </div>
-  
-        {/* Ornament Kanan */}
-        <div className="tvb-ornament tvb-ornament-br">
-          <svg viewBox="0 0 100 100" fill="none">
-            {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => (
-              <line
-                key={i}
-                x1="50" y1="50"
-                x2={50 + 45 * Math.cos((deg * Math.PI) / 180)}
-                y2={50 + 45 * Math.sin((deg * Math.PI) / 180)}
-                stroke="rgba(160, 20, 20, 0.70)"
-                strokeWidth="12"
-                strokeLinecap="round"
-              />
-            ))}
-          </svg>
-        </div>
-  
       </div>
     );
   }
@@ -500,7 +542,7 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
       {/* Modal Form */}
       {open && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content export-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content export-modal jadwal-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header export-header">
               <div>
                 <h2>{editing ? "Edit Jadwal" : "Tambah Jadwal"}</h2>
@@ -578,14 +620,17 @@ export default function JadwalKhususPage({ tvMode, setTvMode }: Props) {
               </div>
 
               <div className="export-field">
-                <label className="export-label">Label Peserta</label>
+                <label className="export-label">Peserta Label</label>
                 <input
                   type="text"
-                  value={form.peserta_label}
-                  onChange={(e) => setForm((p) => ({ ...p, peserta_label: e.target.value }))}
+                  value="PESERTA ZOOM"
                   className="form-input"
-                  placeholder="PESERTA ZOOM"
+                  disabled
+                  style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
                 />
+                <small style={{ color: "#6b7280", fontSize: 12 }}>
+                  Otomatis terisi "PESERTA ZOOM"
+                </small>
               </div>
 
               <div className="export-field" style={{ gridColumn: "1 / -1" }}>
