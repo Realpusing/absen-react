@@ -1152,7 +1152,6 @@ const fetchAllExportData = async (tanggalMulai: string, tanggalSelesai: string) 
         tanggalSelesai: exportTanggalSelesai,
         penanggungJawab,
         jabatanPenanggungJawab,
-        hariKerja: 22,
   
         kolomAbsenList: kolomData,
         absensiData: absensiData,

@@ -12,7 +12,6 @@ interface ExportRekapParams {
   tanggalSelesai: string;
   penanggungJawab: string;
   jabatanPenanggungJawab: string;
-  hariKerja?: number;
   
   kolomAbsenList?: KolomAbsen[];
   absensiData?: Absensi[];
@@ -243,9 +242,9 @@ export async function exportToExcel({
   tanggalSelesai,
   penanggungJawab,
   jabatanPenanggungJawab,
-  hariKerja = 22,
   kolomAbsenList = [],
   absensiData = [],
+  
   absensiKeteranganData = [],
   keteranganColumns = [],
   isKegiatanMode = false,
@@ -591,7 +590,7 @@ export async function exportToExcel({
 
           colIndex++;
         }
-        
+
         const keteranganRecord = absensiKeteranganData.find(
           (a) => a.pegawai_id === pegawai.id
         );
