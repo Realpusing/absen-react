@@ -14,14 +14,12 @@ interface ExportRekapParams {
   jabatanPenanggungJawab: string;
   hariKerja?: number;
   
-  // DATA KEGIATAN
   kolomAbsenList?: KolomAbsen[];
   absensiData?: Absensi[];
   absensiKeteranganData?: AbsensiKeterangan[];
   keteranganColumns?: KeteranganAbsen[];
   isKegiatanMode?: boolean;
   
-  // INFO KEGIATAN
   kegiatanInfo?: {
     instruktur?: string | null;
     asisten?: string | null;
@@ -50,23 +48,71 @@ const BLUE = "FF0EA5E9";
 const LIGHT_BLUE = "FFE0F2FE";
 const SOFT_GRAY = "FFF1F5F9";
 
-function countStatus(absenList: Absen[], pegawaiId: number, status: KeteranganAbsen) {
-  return absenList.filter(
-    (a) => a.pegawai_id === pegawaiId && a.keterangan === status
-  ).length;
+// ✅ HELPER: Hitung jumlah hari kerja
+function countWorkingDays(tanggalMulai: string, tanggalSelesai: string): number {
+  const startDate = new Date(tanggalMulai);
+  const endDate = new Date(tanggalSelesai);
+  let count = 0;
+
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      count++;
+    }
+  }
+
+  return count;
 }
 
-function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
-  return pegawaiList.map((pegawai) => {
-    const hadir = countStatus(absenList, pegawai.id, "Hadir");
-    const dinasLuar = countStatus(absenList, pegawai.id, "Dinas Luar");
-    const dinasDalam = countStatus(absenList, pegawai.id, "Dinas Dalam");
-    const cuti = countStatus(absenList, pegawai.id, "Cuti");
-    const sakit = countStatus(absenList, pegawai.id, "Sakit");
-    const alpha = countStatus(absenList, pegawai.id, "Alpha");
-    const izin = countStatus(absenList, pegawai.id, "Izin");
+// ✅ SIMPLE COUNT FUNCTION - PURE & CLEAN
+function countAbsenByStatus(
+  absenList: Absen[],
+  pegawaiId: number,
+  status: KeteranganAbsen
+): number {
+  let count = 0;
+  for (let i = 0; i < absenList.length; i++) {
+    if (absenList[i].pegawai_id === pegawaiId && absenList[i].keterangan === status) {
+      count++;
+    }
+  }
+  return count;
+}
 
-    return {
+// ✅ BUILD REKAP - SIMPLE & RELIABLE
+function buildRekap(
+  pegawaiList: Pegawai[],
+  absenList: Absen[],
+  tanggalMulai: string,
+  tanggalSelesai: string
+): RekapItem[] {
+  const totalHariKerja = countWorkingDays(tanggalMulai, tanggalSelesai);
+  const rekap: RekapItem[] = [];
+
+  console.log(`\n📊 Building Rekap - Total Hari Kerja: ${totalHariKerja}`);
+  console.log(`📊 Total Pegawai: ${pegawaiList.length}`);
+  console.log(`📊 Total Absen Records: ${absenList.length}\n`);
+
+  for (const pegawai of pegawaiList) {
+    const hadir = countAbsenByStatus(absenList, pegawai.id, "Hadir");
+    const dinasLuar = countAbsenByStatus(absenList, pegawai.id, "Dinas Luar");
+    const dinasDalam = countAbsenByStatus(absenList, pegawai.id, "Dinas Dalam");
+    const cuti = countAbsenByStatus(absenList, pegawai.id, "Cuti");
+    const sakit = countAbsenByStatus(absenList, pegawai.id, "Sakit");
+    const alpha = countAbsenByStatus(absenList, pegawai.id, "Alpha");
+    const izin = countAbsenByStatus(absenList, pegawai.id, "Izin");
+
+    const totalKehadiran = hadir + dinasLuar + dinasDalam;
+    const totalTercatat = hadir + dinasLuar + dinasDalam + cuti + sakit + alpha + izin;
+
+    console.log(
+      `${pegawai.cluster.padEnd(15)} | ${pegawai.nama_pegawai.padEnd(40)} | ` +
+      `H:${hadir.toString().padStart(2)} DL:${dinasLuar.toString().padStart(2)} DD:${dinasDalam.toString().padStart(2)} ` +
+      `C:${cuti.toString().padStart(2)} S:${sakit.toString().padStart(2)} A:${alpha.toString().padStart(2)} I:${izin.toString().padStart(2)} ` +
+      `| Total Kehadiran: ${totalKehadiran} | Tercatat: ${totalTercatat}/${totalHariKerja}`
+    );
+
+    rekap.push({
       pegawai,
       hadir,
       dinasLuar,
@@ -75,9 +121,11 @@ function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
       sakit,
       alpha,
       izin,
-      totalKehadiran: hadir + dinasLuar + dinasDalam,
-    };
-  });
+      totalKehadiran,
+    });
+  }
+
+  return rekap;
 }
 
 function applyBorder(cell: ExcelJS.Cell, color = BLACK) {
@@ -108,11 +156,11 @@ function styleHeader(cell: ExcelJS.Cell, bgColor = YELLOW, textColor = BLACK) {
   applyBorder(cell);
 }
 
-function styleBody(
+const styleBody = (
   cell: ExcelJS.Cell,
   align: "left" | "center" = "center",
   isTotal = false
-) {
+) => {
   if (isTotal) {
     cell.fill = {
       type: "pattern",
@@ -125,10 +173,17 @@ function styleBody(
       color: { argb: BLACK },
     };
   } else {
-    cell.font = {
-      size: 11,
-      color: { argb: BLACK },
-    };
+    if (cell.value === "-") {
+      cell.font = {
+        size: 11,
+        color: { argb: "#FF94A3B8" },
+      };
+    } else {
+      cell.font = {
+        size: 11,
+        color: { argb: BLACK },
+      };
+    }
   }
 
   cell.alignment = {
@@ -138,7 +193,7 @@ function styleBody(
   };
 
   applyBorder(cell);
-}
+};
 
 async function imageUrlToBase64(url: string): Promise<string | null> {
   try {
@@ -185,7 +240,7 @@ export async function exportToExcel({
   absenList,
   kegiatanLabel,
   tanggalMulai,
-  tanggalSelesai: _tanggalSelesai,
+  tanggalSelesai,
   penanggungJawab,
   jabatanPenanggungJawab,
   hariKerja = 22,
@@ -197,14 +252,16 @@ export async function exportToExcel({
   kegiatanInfo = null,
 }: ExportRekapParams) {
   
-  console.log("📊 Export Excel Started:", {
-    isKegiatanMode,
-    kolomAbsenList: kolomAbsenList.length,
-    absensiData: absensiData.length,
-    keteranganColumns: keteranganColumns.length,
-    pegawaiList: pegawaiList.length,
-    kegiatanInfo,
-  });
+  console.log("\n" + "=".repeat(100));
+  console.log("📊 EXPORT EXCEL STARTED");
+  console.log("=".repeat(100));
+  console.log(`📅 Periode: ${tanggalMulai} - ${tanggalSelesai}`);
+  console.log(`👥 Total Pegawai: ${pegawaiList.length}`);
+  console.log(`📋 Total Absen: ${absenList.length}`);
+  console.log(`🎯 Mode: ${isKegiatanMode ? "KEGIATAN" : "HARIAN"}`);
+  console.log("=".repeat(100) + "\n");
+
+  const totalHariKerja = countWorkingDays(tanggalMulai, tanggalSelesai);
 
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Rekap Absen");
@@ -216,24 +273,17 @@ export async function exportToExcel({
 
   const groupedKolom = groupKolomByKategori(kolomAbsenList);
   const allMetode = [...groupedKolom.values()].flat();
-  
-  console.log("📋 Grouped Kolom:", {
-    categories: Array.from(groupedKolom.keys()),
-    totalMetode: allMetode.length,
-  });
 
   const baseColumns = 4;
   const penilaianColumns = allMetode.length;
   const keteranganColumnsCount = keteranganColumns.length;
-  
+
   let totalColumns: number;
 
   if (isKegiatanMode && (penilaianColumns > 0 || keteranganColumnsCount > 0)) {
     totalColumns = baseColumns + penilaianColumns + keteranganColumnsCount;
-    console.log("✅ Mode Kegiatan - Total Columns:", totalColumns);
   } else {
-    totalColumns = 12;
-    console.log("✅ Mode Harian - Total Columns:", totalColumns);
+    totalColumns = 13;
   }
 
   const lastColumnLetter = getColumnLetter(totalColumns);
@@ -248,14 +298,12 @@ export async function exportToExcel({
       columnWidths.push(12);
     }
   } else {
-    columnWidths.push(10, 14, 14, 9, 9, 9, 9, 18);
+    columnWidths.push(10, 14, 14, 9, 9, 9, 9, 12, 18);
   }
 
-  worksheet.columns = columnWidths.map(width => ({ width }));
+  worksheet.columns = columnWidths.map((width) => ({ width }));
 
-  // ═══════════════════════════════════════════════════════════════
-  // HEADER ATAS
-  // ═══════════════════════════════════════════════════════════════
+  // HEADER
   worksheet.mergeCells(`A1:${lastColumnLetter}2`);
   const topCell = worksheet.getCell("A1");
   topCell.value = "";
@@ -267,7 +315,6 @@ export async function exportToExcel({
     right: { style: "thin", color: { argb: GREEN } },
   };
 
-  // ✅ LOGO DI TENGAH PERSIS
   const logoBase64 = await imageUrlToBase64(logoBsn);
   if (logoBase64) {
     const imageId = workbook.addImage({
@@ -275,7 +322,7 @@ export async function exportToExcel({
       extension: "png",
     });
 
-    const logoCol = (totalColumns / 2) - 1;
+    const logoCol = totalColumns / 2 - 1;
     worksheet.addImage(imageId, {
       tl: { col: logoCol, row: 0.2 },
       ext: { width: 58, height: 58 },
@@ -306,12 +353,27 @@ export async function exportToExcel({
     vertical: "middle",
   };
 
+  let tanggalText = "";
+  if (tanggalMulai === tanggalSelesai) {
+    tanggalText = `TANGGAL: ${new Date(tanggalMulai).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })}`;
+  } else {
+    tanggalText = `PERIODE: ${new Date(tanggalMulai).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })} - ${new Date(tanggalSelesai).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })}`;
+  }
+
   worksheet.mergeCells(`A6:${lastColumnLetter}6`);
-  worksheet.getCell("A6").value = `TANGGAL: ${new Date(tanggalMulai).toLocaleDateString("id-ID", { 
-    day: "numeric", 
-    month: "long", 
-    year: "numeric" 
-  })}`;
+  worksheet.getCell("A6").value = tanggalText;
   worksheet.getCell("A6").font = {
     bold: true,
     size: 13,
@@ -322,9 +384,6 @@ export async function exportToExcel({
     vertical: "middle",
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  // ✅ INFO KEGIATAN (POLOS TANPA WARNA)
-  // ═══════════════════════════════════════════════════════════════
   let currentRow = 8;
 
   if (isKegiatanMode && kegiatanInfo) {
@@ -340,10 +399,10 @@ export async function exportToExcel({
         worksheet.mergeCells(`A${currentRow}:${lastColumnLetter}${currentRow}`);
         const cell = worksheet.getCell(`A${currentRow}`);
         cell.value = `${item.label}: ${item.value}`;
-        cell.font = { 
-          bold: item.label !== "Materi", 
-          size: 11, 
-          color: { argb: BLACK } 
+        cell.font = {
+          bold: item.label !== "Materi",
+          size: 11,
+          color: { argb: BLACK },
         };
         cell.alignment = { horizontal: "left", vertical: "middle" };
         applyBorder(cell);
@@ -357,7 +416,7 @@ export async function exportToExcel({
   if (!isKegiatanMode) {
     worksheet.mergeCells(`A${currentRow}:${lastColumnLetter}${currentRow}`);
     const hariCell = worksheet.getCell(`A${currentRow}`);
-    hariCell.value = `HARI KERJA : ${hariKerja} HARI`;
+    hariCell.value = `HARI KERJA : ${totalHariKerja} HARI`;
     hariCell.font = {
       bold: true,
       size: 12,
@@ -378,28 +437,34 @@ export async function exportToExcel({
 
   let nomorGlobal = 1;
 
-  // ═══════════════════════════════════════════════════════════════
-  // LOOP PER CLUSTER
-  // ═══════════════════════════════════════════════════════════════
+  // ✅ BUILD REKAP SEKALI UNTUK SEMUA PEGAWAI
+  const allRekap = buildRekap(pegawaiList, absenList, tanggalMulai, tanggalSelesai);
+
+  console.log(`\n📊 Rekap Summary:`);
   for (const cluster of clusterOptions) {
-    const list = pegawaiList
+    const clusterData = allRekap.filter(r => r.pegawai.cluster === cluster);
+    if (clusterData.length > 0) {
+      console.log(`  ${cluster}: ${clusterData.length} pegawai`);
+    }
+  }
+  console.log("");
+
+  // LOOP PER CLUSTER
+  for (const cluster of clusterOptions) {
+    const clusterPegawai = pegawaiList
       .filter((p) => p.cluster === cluster)
-      .sort((a, b) => {
-        const urutanA = a.urutan ?? 999999;
-        const urutanB = b.urutan ?? 999999;
-        return urutanA - urutanB;
-      });
+      .sort((a, b) => (a.urutan ?? 999999) - (b.urutan ?? 999999));
 
-    if (list.length === 0) continue;
+    if (clusterPegawai.length === 0) continue;
 
-    console.log(`📦 Processing cluster: ${cluster} (${list.length} pegawai)`);
+    const clusterRekap = allRekap.filter((r) => r.pegawai.cluster === cluster);
+
+    console.log(`\n📦 Writing Excel for cluster: ${cluster} (${clusterRekap.length} pegawai)`);
 
     if (isKegiatanMode && (penilaianColumns > 0 || keteranganColumnsCount > 0)) {
-      
-      console.log("🎨 Creating 2-level header...");
-      
+      // MODE KEGIATAN - HEADER
       const headerRow1 = worksheet.getRow(currentRow);
-      
+
       worksheet.mergeCells(currentRow, 1, currentRow + 1, 1);
       worksheet.mergeCells(currentRow, 2, currentRow + 1, 2);
       worksheet.mergeCells(currentRow, 3, currentRow + 1, 3);
@@ -426,8 +491,6 @@ export async function exportToExcel({
         const startCol = colIndex;
         const endCol = colIndex + methods.length - 1;
 
-        console.log(`  📌 Category: ${kategori} (cols ${startCol}-${endCol})`);
-
         if (methods.length > 1) {
           worksheet.mergeCells(currentRow, startCol, currentRow, endCol);
         }
@@ -449,8 +512,6 @@ export async function exportToExcel({
       if (keteranganColumnsCount > 0) {
         const startCol = colIndex;
         const endCol = colIndex + keteranganColumnsCount - 1;
-
-        console.log(`  📌 ABSEN section (cols ${startCol}-${endCol})`);
 
         if (keteranganColumnsCount > 1) {
           worksheet.mergeCells(currentRow, startCol, currentRow, endCol);
@@ -476,17 +537,15 @@ export async function exportToExcel({
 
       for (const metode of allMetode) {
         const cell = headerRow2.getCell(colIndex);
-        
+
         let cellValue = metode.metode || "-";
         if (metode.satuan) {
           cellValue += `\n(${metode.satuan})`;
         }
-        
+
         cell.value = cellValue;
         styleHeader(cell, YELLOW, BLACK);
-        
-        console.log(`    ✏️ Metode col ${colIndex}: ${metode.metode}`);
-        
+
         colIndex++;
       }
 
@@ -494,51 +553,17 @@ export async function exportToExcel({
         const cell = headerRow2.getCell(colIndex);
         cell.value = ket;
         styleHeader(cell, BLUE, "FFFFFFFF");
-        
-        console.log(`    ✅ Keterangan col ${colIndex}: ${ket}`);
-        
+
         colIndex++;
       }
 
       headerRow2.height = 28;
       currentRow++;
 
-    } else {
-      
-      const headerRow = worksheet.getRow(currentRow);
-      const headers = [
-        "NO",
-        "NO",
-        "NAMA",
-        "NIP",
-        "HADIR",
-        "DINAS LUAR",
-        "DINAS DALAM",
-        "CUTI",
-        "SAKIT",
-        "ALPA",
-        "IZIN",
-        "LEPAS PIKET",
-        "TOTAL KEHADIRAN",
-      ];
+      // DATA ROWS KEGIATAN
+      let nomorCluster = 1;
 
-      headers.forEach((header, index) => {
-        const cell = headerRow.getCell(index + 1);
-        cell.value = header;
-        styleHeader(cell);
-      });
-
-      headerRow.height = 32;
-      currentRow++;
-    }
-
-    let nomorCluster = 1;
-
-    if (isKegiatanMode && (penilaianColumns > 0 || keteranganColumnsCount > 0)) {
-      
-      console.log("💾 Writing data rows (mode kegiatan)...");
-      
-      list.forEach((pegawai) => {
+      clusterPegawai.forEach((pegawai) => {
         const row = worksheet.getRow(currentRow);
 
         row.getCell(1).value = nomorGlobal;
@@ -557,17 +582,13 @@ export async function exportToExcel({
           const absensiRecord = absensiData.find(
             (a) => a.pegawai_id === pegawai.id && a.kolom_absen_id === metode.id
           );
-          
+
           const nilai = absensiRecord?.nilai || "-";
 
           const cell = row.getCell(colIndex);
           cell.value = nilai;
           styleBody(cell, "center");
-          
-          if (absensiRecord) {
-            console.log(`      📝 ${pegawai.nama_pegawai} - ${metode.metode}: ${nilai}`);
-          }
-          
+
           colIndex++;
         }
 
@@ -578,8 +599,9 @@ export async function exportToExcel({
 
         for (const ket of keteranganColumns) {
           const cell = row.getCell(colIndex);
-          cell.value = currentKet === ket ? "✓" : "";
+          cell.value = currentKet === ket ? "✓" : "-";
           styleBody(cell, "center");
+
           colIndex++;
         }
 
@@ -588,37 +610,69 @@ export async function exportToExcel({
         nomorCluster++;
         currentRow++;
       });
-
     } else {
-      
-      console.log("💾 Writing data rows (mode harian)...");
-      
-      const rekap = buildRekap(list, absenList);
+      // MODE HARIAN - HEADER
+      const headerRow = worksheet.getRow(currentRow);
+      const headers = [
+        "NO",
+        "NO",
+        "NAMA",
+        "NIP",
+        "HADIR",
+        "DINAS LUAR",
+        "DINAS DALAM",
+        "CUTI",
+        "SAKIT",
+        "ALPHA",
+        "IZIN",
+        "LEPAS PIKET",
+        "TOTAL KEHADIRAN",
+      ];
 
-      rekap.forEach((item) => {
+      headers.forEach((header, index) => {
+        const cell = headerRow.getCell(index + 1);
+        cell.value = header;
+        styleHeader(cell);
+      });
+
+      headerRow.height = 32;
+      currentRow++;
+
+      // DATA ROWS HARIAN
+      let nomorCluster = 1;
+
+      clusterRekap.forEach((item) => {
         const row = worksheet.getRow(currentRow);
+
+        const lepasPiket = 0;
 
         const values = [
           nomorGlobal,
           nomorCluster,
           item.pegawai.nama_pegawai,
           item.pegawai.nip,
-          item.hadir,
-          item.dinasLuar,
-          item.dinasDalam,
-          item.cuti,
-          item.sakit,
-          item.alpha,
-          item.izin,
-          item.totalKehadiran,
+          item.hadir || "-",
+          item.dinasLuar || "-",
+          item.dinasDalam || "-",
+          item.cuti || "-",
+          item.sakit || "-",
+          item.alpha || "-",
+          item.izin || "-",
+          lepasPiket || "-",
+          item.totalKehadiran || "-",
         ];
 
         values.forEach((value, index) => {
           const cell = row.getCell(index + 1);
-          cell.value = value;
 
-          const isText = index === 2 || index === 3;
-          const isTotal = index === 11;
+          if (value === "-") {
+            cell.value = "-";
+          } else {
+            cell.value = value;
+          }
+
+          const isText = index === 2 || index === 3 || value === "-";
+          const isTotal = index === 12;
 
           styleBody(cell, isText ? "left" : "center", isTotal);
         });
@@ -631,17 +685,20 @@ export async function exportToExcel({
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
   // TTD
-  // ═══════════════════════════════════════════════════════════════
   currentRow += 2;
 
   const ttdStartCol = Math.max(totalColumns - 3, 5);
   const ttdStartColLetter = getColumnLetter(ttdStartCol);
 
-  worksheet.mergeCells(`${ttdStartColLetter}${currentRow}:${lastColumnLetter}${currentRow}`);
+  worksheet.mergeCells(
+    `${ttdStartColLetter}${currentRow}:${lastColumnLetter}${currentRow}`
+  );
   worksheet.getCell(`${ttdStartColLetter}${currentRow}`).value = "Mengetahui,";
-  worksheet.getCell(`${ttdStartColLetter}${currentRow}`).font = { bold: true, size: 11 };
+  worksheet.getCell(`${ttdStartColLetter}${currentRow}`).font = {
+    bold: true,
+    size: 11,
+  };
   worksheet.getCell(`${ttdStartColLetter}${currentRow}`).alignment = {
     horizontal: "center",
     vertical: "middle",
@@ -649,8 +706,11 @@ export async function exportToExcel({
 
   currentRow++;
 
-  worksheet.mergeCells(`${ttdStartColLetter}${currentRow}:${lastColumnLetter}${currentRow}`);
-  worksheet.getCell(`${ttdStartColLetter}${currentRow}`).value = jabatanPenanggungJawab || "";
+  worksheet.mergeCells(
+    `${ttdStartColLetter}${currentRow}:${lastColumnLetter}${currentRow}`
+  );
+  worksheet.getCell(`${ttdStartColLetter}${currentRow}`).value =
+    jabatanPenanggungJawab || "";
   worksheet.getCell(`${ttdStartColLetter}${currentRow}`).alignment = {
     horizontal: "center",
     vertical: "middle",
@@ -658,8 +718,11 @@ export async function exportToExcel({
 
   currentRow += 4;
 
-  worksheet.mergeCells(`${ttdStartColLetter}${currentRow}:${lastColumnLetter}${currentRow}`);
-  worksheet.getCell(`${ttdStartColLetter}${currentRow}`).value = penanggungJawab || "";
+  worksheet.mergeCells(
+    `${ttdStartColLetter}${currentRow}:${lastColumnLetter}${currentRow}`
+  );
+  worksheet.getCell(`${ttdStartColLetter}${currentRow}`).value =
+    penanggungJawab || "";
   worksheet.getCell(`${ttdStartColLetter}${currentRow}`).font = {
     bold: true,
     size: 12,
@@ -670,23 +733,18 @@ export async function exportToExcel({
     vertical: "middle",
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  // ✅ TANPA FREEZE PANES (dihapus)
-  // ═══════════════════════════════════════════════════════════════
-
-  // ═══════════════════════════════════════════════════════════════
   // SAVE FILE
-  // ═══════════════════════════════════════════════════════════════
-  console.log("💾 Saving Excel file...");
-  
+  console.log("\n💾 Saving Excel file...");
+
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 
   const fileName = `Rekap_${kegiatanLabel.replace(/\s+/g, "_")}_${tanggalMulai}.xlsx`;
-  
+
   saveAs(blob, fileName);
-  
-  console.log("✅ Export completed:", fileName);
+
+  console.log(`✅ Export completed: ${fileName}`);
+  console.log("=".repeat(100) + "\n");
 }

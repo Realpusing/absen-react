@@ -727,6 +727,208 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       setBulkLoadingCluster(null);
     }
   };
+  // ══════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS - FETCH RANGE DATA DENGAN LOADING
+// ══════════════════════════════════════════════════════════════
+
+const fetchAllExportData = async (tanggalMulai: string, tanggalSelesai: string) => {
+  console.log("⏳ [0/6] Memulai fetch semua data export...", { tanggalMulai, tanggalSelesai });
+
+  try {
+    // ✅ STEP 0: Fetch Fresh Pegawai List
+    console.log("⏳ [0/6] Fetching fresh pegawai list...");
+    const { data: pegawaiDataRaw, error: pegawaiError } = await supabase
+      .from("pegawai")
+      .select("*")
+      .order("urutan", { ascending: true });
+
+    if (pegawaiError) {
+      console.error("❌ [0/6] Error fetch pegawai:", pegawaiError);
+      throw new Error(`Gagal fetch pegawai: ${pegawaiError.message}`);
+    }
+
+    let freshPegawaiList = (pegawaiDataRaw || []) as Pegawai[];
+    console.log(`✅ [0/6] Pegawai fetched: ${freshPegawaiList.length} records`);
+
+    // ✅ Jika mode kegiatan, filter pegawai yang di-assign
+    if (selectedKegiatanId !== null) {
+      console.log("⏳ [0/6] Mode kegiatan - Fetching pegawai kegiatan...");
+      const { data: kegiatanPegawaiData, error: kegiatanPegawaiError } = await supabase
+        .from("kegiatan_pegawai")
+        .select("*")
+        .eq("kegiatan_id", selectedKegiatanId);
+
+      if (kegiatanPegawaiError) {
+        console.error("❌ [0/6] Error fetch kegiatan_pegawai:", kegiatanPegawaiError);
+        throw new Error(`Gagal fetch kegiatan_pegawai: ${kegiatanPegawaiError.message}`);
+      }
+
+      const assignedIds = (kegiatanPegawaiData || []).map((row) => row.pegawai_id);
+      freshPegawaiList = freshPegawaiList.filter((p) => assignedIds.includes(p.id));
+      console.log(`✅ [0/6] Filtered to assigned pegawai: ${freshPegawaiList.length} records`);
+    }
+
+    // ✅ STEP 1: Fetch Absen Harian
+    console.log("⏳ [1/6] Fetching absen harian...");
+    const { data: absenData, error: absenError } = await supabase
+      .from("absen")
+      .select("*")
+      .gte("tanggal", tanggalMulai)
+      .lte("tanggal", tanggalSelesai)
+      .is("kegiatan_id", null);
+
+    if (absenError) {
+      console.error("❌ [1/6] Error fetch absen:", absenError);
+      throw new Error(`Gagal fetch absen: ${absenError.message}`);
+    }
+    console.log(`✅ [1/6] Absen fetched: ${absenData?.length || 0} records`);
+
+    // ✅ STEP 2: Fetch Absensi Kegiatan (untuk mode kegiatan)
+    console.log("⏳ [2/6] Fetching absensi kegiatan...");
+    let absensiData: Absensi[] = [];
+    if (selectedKegiatanId !== null) {
+      const { data, error } = await supabase
+        .from("absensi")
+        .select("*")
+        .eq("kegiatan_id", selectedKegiatanId)
+        .gte("tanggal", tanggalMulai)
+        .lte("tanggal", tanggalSelesai);
+
+      if (error) {
+        console.error("❌ [2/6] Error fetch absensi:", error);
+        throw new Error(`Gagal fetch absensi: ${error.message}`);
+      }
+      absensiData = data || [];
+      console.log(`✅ [2/6] Absensi fetched: ${absensiData.length} records`);
+    } else {
+      console.log("⏳ [2/6] Skip (mode harian)");
+    }
+
+    // ✅ STEP 3: Fetch Absensi Keterangan
+    console.log("⏳ [3/6] Fetching absensi keterangan...");
+    let absensiKeteranganData: AbsensiKeterangan[] = [];
+    if (selectedKegiatanId !== null) {
+      const { data, error } = await supabase
+        .from("absensi_keterangan")
+        .select("*")
+        .eq("kegiatan_id", selectedKegiatanId)
+        .gte("tanggal", tanggalMulai)
+        .lte("tanggal", tanggalSelesai);
+
+      if (error) {
+        console.error("❌ [3/6] Error fetch keterangan:", error);
+        throw new Error(`Gagal fetch keterangan: ${error.message}`);
+      }
+      absensiKeteranganData = data || [];
+      console.log(`✅ [3/6] Keterangan fetched: ${absensiKeteranganData.length} records`);
+    } else {
+      console.log("⏳ [3/6] Skip (mode harian)");
+    }
+
+    // ✅ STEP 4: Fetch Kolom Absen (untuk mode kegiatan)
+    console.log("⏳ [4/6] Fetching kolom absen...");
+    let kolomData: KolomAbsen[] = [];
+    if (selectedKegiatanId !== null) {
+      const { data, error } = await supabase
+        .from("kolom_absen")
+        .select("*")
+        .eq("kegiatan_id", selectedKegiatanId)
+        .order("urutan", { ascending: true });
+
+      if (error) {
+        console.error("❌ [4/6] Error fetch kolom:", error);
+        throw new Error(`Gagal fetch kolom: ${error.message}`);
+      }
+      kolomData = data || [];
+      console.log(`✅ [4/6] Kolom fetched: ${kolomData.length} records`);
+    } else {
+      console.log("⏳ [4/6] Skip (mode harian)");
+    }
+
+    // ✅ STEP 5: Validasi & Prepare Data
+    console.log("⏳ [5/6] Validasi & prepare data...");
+
+    // Validasi data kosong
+    if (selectedKegiatanId === null && (absenData?.length || 0) === 0) {
+      throw new Error(
+        `Tidak ada data absen untuk periode ${new Date(tanggalMulai).toLocaleDateString("id-ID")} - ${new Date(tanggalSelesai).toLocaleDateString("id-ID")}`
+      );
+    }
+
+    // Prepare kegiatan info
+    let kegiatanInfo = null;
+    if (selectedKegiatanId !== null && selectedKegiatan) {
+      const instrukturNama = selectedKegiatan.instruktur_id
+        ? freshPegawaiList.find((p) => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai
+        : null;
+
+      const asistenNama = selectedKegiatan.asisten_id
+        ? freshPegawaiList.find((p) => p.id === selectedKegiatan.asisten_id)?.nama_pegawai
+        : null;
+
+      const pejabatNama = selectedKegiatan.pejabat_id
+        ? freshPegawaiList.find((p) => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai
+        : null;
+
+      kegiatanInfo = {
+        instruktur: instrukturNama,
+        asisten: asistenNama,
+        pejabat: pejabatNama,
+        materi: selectedKegiatan.materi,
+      };
+    }
+
+    console.log("✅ [5/6] Data validated & prepared");
+
+    // ✅ STEP 6: Cross-check data completeness
+    console.log("⏳ [6/6] Cross-checking data completeness...");
+
+    const pegawaiWithoutAbsen = freshPegawaiList.filter(
+      (p) => !absenData?.some((a) => a.pegawai_id === p.id)
+    );
+
+    if (pegawaiWithoutAbsen.length > 0) {
+      console.warn(
+        `⚠️ ${pegawaiWithoutAbsen.length} pegawai tidak ada data absen:`,
+        pegawaiWithoutAbsen.map((p) => `${p.nama_pegawai} (ID: ${p.id})`)
+      );
+    }
+
+    console.log("✅ [6/6] Data completeness check passed");
+
+    // ✅ SUMMARY
+    console.log("✅ ========== DATA SUMMARY ==========");
+    console.log({
+      mode: selectedKegiatanId === null ? "HARIAN" : "KEGIATAN",
+      pegawaiTotal: freshPegawaiList.length,
+      absen: absenData?.length || 0,
+      absensi: absensiData.length,
+      keterangan: absensiKeteranganData.length,
+      kolom: kolomData.length,
+      pegawaiTanpaAbsen: pegawaiWithoutAbsen.length,
+      range: { tanggalMulai, tanggalSelesai },
+    });
+
+    return {
+      success: true,
+      data: {
+        pegawaiList: freshPegawaiList, // ✅ TAMBAHAN: Return fresh pegawai list
+        absenList: (absenData || []) as Absen[],
+        absensiData: absensiData as Absensi[],
+        absensiKeteranganData: absensiKeteranganData as AbsensiKeterangan[],
+        kolomAbsenList: kolomData as KolomAbsen[],
+        kegiatanInfo,
+      },
+    };
+
+  } catch (error: any) {
+    console.error("❌ Error fetch all export data:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
 
   // ══════════════════════════════════════════════════════════════
   // DATE NAVIGATION
@@ -754,46 +956,331 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     setShowExportModal(true);
   };
 
-  const confirmExportExcel = () => {
-    // Debug log
-    console.log("🔍 Export Debug:", {
-      isKegiatanMode: selectedKegiatanId !== null,
-      selectedKegiatanId,
-      kolomAbsenList: kolomAbsenList.length,
-      absensiKegiatanData: absensiKegiatanData.length,
-      keteranganColumns: keteranganColumns.length,
-      allMetode: allMetode.length,
-    });
-
-    // ✅ Prepare kegiatan info
-    let kegiatanInfo = null;
-    if (selectedKegiatanId !== null && selectedKegiatan) {
-      const instrukturNama = selectedKegiatan.instruktur_id 
-        ? pegawaiList.find(p => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai 
-        : null;
-      
-      const asistenNama = selectedKegiatan.asisten_id 
-        ? pegawaiList.find(p => p.id === selectedKegiatan.asisten_id)?.nama_pegawai 
-        : null;
-      
-      const pejabatNama = selectedKegiatan.pejabat_id 
-        ? pegawaiList.find(p => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai 
-        : null;
-
-      kegiatanInfo = {
-        instruktur: instrukturNama,
-        asisten: asistenNama,
-        pejabat: pejabatNama,
-        materi: selectedKegiatan.materi,
-      };
-
-      console.log("📋 Kegiatan Info:", kegiatanInfo);
-    }
-
+  const confirmExportExcel = async () => {
     try {
+      // ✅ Show loading toast
+      const loadingToast = Swal.fire({
+        title: "Mempersiapkan Data...",
+        html: `
+          <div style="text-align: center;">
+            <div style="margin: 20px 0;">
+              <div style="
+                border: 4px solid #f3f4f6;
+                border-top: 4px solid #3b82f6;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto;
+              "></div>
+            </div>
+            <p style="color: #64748b; font-size: 14px; margin: 10px 0;">
+              Fetching semua data dari database...
+            </p>
+            <p style="color: #94a3b8; font-size: 12px;">
+              Periode: ${new Date(exportTanggalMulai).toLocaleDateString("id-ID")} - ${new Date(exportTanggalSelesai).toLocaleDateString("id-ID")}
+            </p>
+          </div>
+        `,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        willClose: () => {
+          // Remove animation style
+          const style = document.querySelector("style[data-swal-loading]");
+          if (style) style.remove();
+        },
+      });
+      const fetchAllExportData = async (tanggalMulai: string, tanggalSelesai: string) => {
+        console.log("⏳ [0/6] Memulai fetch semua data export...", { tanggalMulai, tanggalSelesai });
+      
+        try {
+          // ✅ STEP 0: Fetch Fresh Pegawai List
+          console.log("⏳ [0/6] Fetching fresh pegawai list...");
+          const { data: pegawaiDataRaw, error: pegawaiError } = await supabase
+            .from("pegawai")
+            .select("*")
+            .order("urutan", { ascending: true });
+      
+          if (pegawaiError) {
+            console.error("❌ [0/6] Error fetch pegawai:", pegawaiError);
+            throw new Error(`Gagal fetch pegawai: ${pegawaiError.message}`);
+          }
+      
+          let freshPegawaiList = (pegawaiDataRaw || []) as Pegawai[];
+          console.log(`✅ [0/6] Pegawai fetched: ${freshPegawaiList.length} records`);
+      
+          // ✅ Jika mode kegiatan, filter pegawai yang di-assign
+          if (selectedKegiatanId !== null) {
+            console.log("⏳ [0/6] Mode kegiatan - Fetching pegawai kegiatan...");
+            const { data: kegiatanPegawaiData, error: kegiatanPegawaiError } = await supabase
+              .from("kegiatan_pegawai")
+              .select("*")
+              .eq("kegiatan_id", selectedKegiatanId);
+      
+            if (kegiatanPegawaiError) {
+              console.error("❌ [0/6] Error fetch kegiatan_pegawai:", kegiatanPegawaiError);
+              throw new Error(`Gagal fetch kegiatan_pegawai: ${kegiatanPegawaiError.message}`);
+            }
+      
+            const assignedIds = (kegiatanPegawaiData || []).map((row) => row.pegawai_id);
+            freshPegawaiList = freshPegawaiList.filter((p) => assignedIds.includes(p.id));
+            console.log(`✅ [0/6] Filtered to assigned pegawai: ${freshPegawaiList.length} records`);
+          }
+      
+          // ✅ STEP 1: Fetch Absen Harian
+          console.log("⏳ [1/6] Fetching absen harian...");
+          const { data: absenData, error: absenError } = await supabase
+            .from("absen")
+            .select("*")
+            .gte("tanggal", tanggalMulai)
+            .lte("tanggal", tanggalSelesai)
+            .is("kegiatan_id", null);
+      
+          if (absenError) {
+            console.error("❌ [1/6] Error fetch absen:", absenError);
+            throw new Error(`Gagal fetch absen: ${absenError.message}`);
+          }
+          console.log(`✅ [1/6] Absen fetched: ${absenData?.length || 0} records`);
+      
+          // ✅ STEP 2: Fetch Absensi Kegiatan (untuk mode kegiatan)
+          console.log("⏳ [2/6] Fetching absensi kegiatan...");
+          let absensiData: Absensi[] = [];
+          if (selectedKegiatanId !== null) {
+            const { data, error } = await supabase
+              .from("absensi")
+              .select("*")
+              .eq("kegiatan_id", selectedKegiatanId)
+              .gte("tanggal", tanggalMulai)
+              .lte("tanggal", tanggalSelesai);
+      
+            if (error) {
+              console.error("❌ [2/6] Error fetch absensi:", error);
+              throw new Error(`Gagal fetch absensi: ${error.message}`);
+            }
+            absensiData = data || [];
+            console.log(`✅ [2/6] Absensi fetched: ${absensiData.length} records`);
+          } else {
+            console.log("⏳ [2/6] Skip (mode harian)");
+          }
+      
+          // ✅ STEP 3: Fetch Absensi Keterangan
+          console.log("⏳ [3/6] Fetching absensi keterangan...");
+          let absensiKeteranganData: AbsensiKeterangan[] = [];
+          if (selectedKegiatanId !== null) {
+            const { data, error } = await supabase
+              .from("absensi_keterangan")
+              .select("*")
+              .eq("kegiatan_id", selectedKegiatanId)
+              .gte("tanggal", tanggalMulai)
+              .lte("tanggal", tanggalSelesai);
+      
+            if (error) {
+              console.error("❌ [3/6] Error fetch keterangan:", error);
+              throw new Error(`Gagal fetch keterangan: ${error.message}`);
+            }
+            absensiKeteranganData = data || [];
+            console.log(`✅ [3/6] Keterangan fetched: ${absensiKeteranganData.length} records`);
+          } else {
+            console.log("⏳ [3/6] Skip (mode harian)");
+          }
+      
+          // ✅ STEP 4: Fetch Kolom Absen (untuk mode kegiatan)
+          console.log("⏳ [4/6] Fetching kolom absen...");
+          let kolomData: KolomAbsen[] = [];
+          if (selectedKegiatanId !== null) {
+            const { data, error } = await supabase
+              .from("kolom_absen")
+              .select("*")
+              .eq("kegiatan_id", selectedKegiatanId)
+              .order("urutan", { ascending: true });
+      
+            if (error) {
+              console.error("❌ [4/6] Error fetch kolom:", error);
+              throw new Error(`Gagal fetch kolom: ${error.message}`);
+            }
+            kolomData = data || [];
+            console.log(`✅ [4/6] Kolom fetched: ${kolomData.length} records`);
+          } else {
+            console.log("⏳ [4/6] Skip (mode harian)");
+          }
+      
+          // ✅ STEP 5: Validasi & Prepare Data
+          console.log("⏳ [5/6] Validasi & prepare data...");
+      
+          // Validasi data kosong
+          if (selectedKegiatanId === null && (absenData?.length || 0) === 0) {
+            throw new Error(
+              `Tidak ada data absen untuk periode ${new Date(tanggalMulai).toLocaleDateString("id-ID")} - ${new Date(tanggalSelesai).toLocaleDateString("id-ID")}`
+            );
+          }
+      
+          // Prepare kegiatan info
+          let kegiatanInfo = null;
+          if (selectedKegiatanId !== null && selectedKegiatan) {
+            const instrukturNama = selectedKegiatan.instruktur_id
+              ? freshPegawaiList.find((p) => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai
+              : null;
+      
+            const asistenNama = selectedKegiatan.asisten_id
+              ? freshPegawaiList.find((p) => p.id === selectedKegiatan.asisten_id)?.nama_pegawai
+              : null;
+      
+            const pejabatNama = selectedKegiatan.pejabat_id
+              ? freshPegawaiList.find((p) => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai
+              : null;
+      
+            kegiatanInfo = {
+              instruktur: instrukturNama,
+              asisten: asistenNama,
+              pejabat: pejabatNama,
+              materi: selectedKegiatan.materi,
+            };
+          }
+      
+          console.log("✅ [5/6] Data validated & prepared");
+      
+          // ✅ STEP 6: Cross-check data completeness
+          console.log("⏳ [6/6] Cross-checking data completeness...");
+      
+          const pegawaiWithoutAbsen = freshPegawaiList.filter(
+            (p) => !absenData?.some((a) => a.pegawai_id === p.id)
+          );
+      
+          if (pegawaiWithoutAbsen.length > 0) {
+            console.warn(
+              `⚠️ ${pegawaiWithoutAbsen.length} pegawai tidak ada data absen:`,
+              pegawaiWithoutAbsen.map((p) => `${p.nama_pegawai} (ID: ${p.id})`)
+            );
+          }
+      
+          console.log("✅ [6/6] Data completeness check passed");
+      
+          // ✅ SUMMARY
+          console.log("✅ ========== DATA SUMMARY ==========");
+          console.log({
+            mode: selectedKegiatanId === null ? "HARIAN" : "KEGIATAN",
+            pegawaiTotal: freshPegawaiList.length,
+            absen: absenData?.length || 0,
+            absensi: absensiData.length,
+            keterangan: absensiKeteranganData.length,
+            kolom: kolomData.length,
+            pegawaiTanpaAbsen: pegawaiWithoutAbsen.length,
+            range: { tanggalMulai, tanggalSelesai },
+          });
+      
+          return {
+            success: true,
+            data: {
+              pegawaiList: freshPegawaiList, // ✅ TAMBAHAN: Return fresh pegawai list
+              absenList: (absenData || []) as Absen[],
+              absensiData: absensiData as Absensi[],
+              absensiKeteranganData: absensiKeteranganData as AbsensiKeterangan[],
+              kolomAbsenList: kolomData as KolomAbsen[],
+              kegiatanInfo,
+            },
+          };
+      
+        } catch (error: any) {
+          console.error("❌ Error fetch all export data:", error);
+          return {
+            success: false,
+            error: error.message,
+          };
+        }
+      };
+      // Add animation style
+      const styleEl = document.createElement("style");
+      styleEl.setAttribute("data-swal-loading", "true");
+      styleEl.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleEl);
+  
+      console.log("🚀 ========== EXPORT PROCESS STARTED ==========");
+      console.log("📅 Periode:", { mulai: exportTanggalMulai, selesai: exportTanggalSelesai });
+      console.log("🎯 Mode:", selectedKegiatanId === null ? "HARIAN" : "KEGIATAN");
+  
+      // ✅ FETCH ALL DATA FRESH FROM DB
+      const fetchResult = await fetchAllExportData(exportTanggalMulai, exportTanggalSelesai);
+  
+      if (!fetchResult.success) {
+        Swal.close();
+        Swal.fire({
+          icon: "error",
+          title: "Gagal Ambil Data",
+          text: fetchResult.error,
+          confirmButtonColor: "#3b82f6",
+        });
+        return;
+      }
+  
+      const { data } = fetchResult;
+  
+      // ✅ VALIDATE DATA BEFORE EXPORT
+      console.log("🔍 Validating data integrity...");
+      
+      if (selectedKegiatanId === null && data.absenList.length === 0) {
+        Swal.close();
+        Swal.fire({
+          icon: "warning",
+          title: "Tidak Ada Data",
+          text: `Tidak ada data absen untuk periode ${new Date(exportTanggalMulai).toLocaleDateString("id-ID")} - ${new Date(exportTanggalSelesai).toLocaleDateString("id-ID")}`,
+          confirmButtonColor: "#3b82f6",
+        });
+        return;
+      }
+  
+      // ✅ CROSS-CHECK: Pastikan setiap pegawai punya data lengkap
+      console.log("🔍 Cross-checking data completeness...");
+      
+      const pegawaiWithoutAbsen = absenPegawaiList.filter(
+        (p) => !data.absenList.some((a) => a.pegawai_id === p.id)
+      );
+  
+      if (pegawaiWithoutAbsen.length > 0) {
+        console.warn(
+          `⚠️ ${pegawaiWithoutAbsen.length} pegawai tidak ada data absen:`,
+          pegawaiWithoutAbsen.map((p) => p.nama_pegawai)
+        );
+      }
+  
+      console.log("✅ Data validation passed");
+  
+      // ✅ EXECUTE EXPORT
+      console.log("📤 Executing export to Excel...");
+      
+      Swal.update({
+        title: "Menggenerate Excel...",
+        html: `
+          <div style="text-align: center;">
+            <div style="margin: 20px 0;">
+              <div style="
+                border: 4px solid #f3f4f6;
+                border-top: 4px solid #10b981;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto;
+              "></div>
+            </div>
+            <p style="color: #64748b; font-size: 14px;">
+              Generating Excel file...
+            </p>
+          </div>
+        `,
+      });
+  
       exportToExcel({
         pegawaiList: absenPegawaiList,
-        absenList: filteredAbsen,
+        absenList: data.absenList,
         kegiatanLabel:
           selectedKegiatanId === null
             ? "Rekap Absen Apel"
@@ -803,33 +1290,50 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         penanggungJawab,
         jabatanPenanggungJawab,
         hariKerja: 22,
-        
+  
         // DATA KEGIATAN
-        kolomAbsenList: selectedKegiatanId !== null ? kolomAbsenList : [],
-        absensiData: selectedKegiatanId !== null ? absensiKegiatanData : [],
-        absensiKeteranganData: selectedKegiatanId !== null ? absensiKeteranganList : [],
+        kolomAbsenList: data.kolomAbsenList,
+        absensiData: data.absensiData,
+        absensiKeteranganData: data.absensiKeteranganData,
         keteranganColumns: selectedKegiatanId !== null ? keteranganColumns : [],
         isKegiatanMode: selectedKegiatanId !== null,
-        
-        // ✅ INFO KEGIATAN
-        kegiatanInfo,
+  
+        // INFO KEGIATAN
+        kegiatanInfo: data.kegiatanInfo,
       });
-
+  
       setShowExportModal(false);
-
+      Swal.close();
+  
+      // ✅ Success notification
       Swal.fire({
         icon: "success",
-        title: "Export Berhasil!",
-        text: "File Excel berhasil didownload",
+        title: "Export Berhasil! ✅",
+        html: `
+          <div style="text-align: left; color: #1f2937;">
+            <p style="margin: 10px 0;">
+              <strong>File yang diunduh:</strong><br>
+              Rekap_${selectedKegiatanId === null ? "Apel" : selectedKegiatan?.nama_kegiatan}_${exportTanggalMulai}.xlsx
+            </p>
+            <p style="margin: 10px 0; font-size: 13px; color: #64748b;">
+              <strong>Data Summary:</strong><br>
+              • Pegawai: ${absenPegawaiList.length}<br>
+              • Absen Records: ${data.absenList.length}<br>
+              • Periode: ${new Date(exportTanggalMulai).toLocaleDateString("id-ID")} - ${new Date(exportTanggalSelesai).toLocaleDateString("id-ID")}
+            </p>
+          </div>
+        `,
         confirmButtonColor: "#3b82f6",
-        toast: true,
-        position: "top-end",
-        timer: 3000,
-        showConfirmButton: false,
+        confirmButtonText: "OK",
       });
-      
+  
+      console.log("✅ ========== EXPORT COMPLETED SUCCESSFULLY ==========");
+  
     } catch (error: any) {
-      console.error("Export error:", error);
+      console.error("❌ Error dalam export process:", error);
+      
+      Swal.close();
+      
       Swal.fire({
         icon: "error",
         title: "Export Gagal!",
