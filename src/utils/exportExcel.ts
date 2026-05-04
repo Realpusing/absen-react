@@ -591,7 +591,7 @@ export async function exportToExcel({
 
           colIndex++;
         }
-
+        
         const keteranganRecord = absensiKeteranganData.find(
           (a) => a.pegawai_id === pegawai.id
         );
