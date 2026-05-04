@@ -80,6 +80,7 @@ function countAbsenByStatus(
 }
 
 // ✅ BUILD REKAP - SIMPLE & RELIABLE
+// ✅ BUILD REKAP - SIMPLE & RELIABLE
 function buildRekap(
   pegawaiList: Pegawai[],
   absenList: Absen[],
@@ -91,9 +92,24 @@ function buildRekap(
 
   console.log(`\n📊 Building Rekap - Total Hari Kerja: ${totalHariKerja}`);
   console.log(`📊 Total Pegawai: ${pegawaiList.length}`);
-  console.log(`📊 Total Absen Records: ${absenList.length}\n`);
+  console.log(`📊 Total Absen Records: ${absenList.length}`);
+  console.log(`📊 Periode: ${tanggalMulai} - ${tanggalSelesai}\n`);
 
   for (const pegawai of pegawaiList) {
+    // ✅ DEBUG: Tampilkan semua data absen untuk pegawai ini
+    const pegawaiAbsenData = absenList.filter(a => a.pegawai_id === pegawai.id);
+    
+    console.log(`\n👤 ${pegawai.nama_pegawai} (ID: ${pegawai.id})`);
+    console.log(`   Total records: ${pegawaiAbsenData.length}`);
+    
+    // Group by keterangan untuk debug
+    const grouped = pegawaiAbsenData.reduce((acc, a) => {
+      acc[a.keterangan] = (acc[a.keterangan] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log(`   Breakdown:`, grouped);
+
     const hadir = countAbsenByStatus(absenList, pegawai.id, "Hadir");
     const dinasLuar = countAbsenByStatus(absenList, pegawai.id, "Dinas Luar");
     const dinasDalam = countAbsenByStatus(absenList, pegawai.id, "Dinas Dalam");
@@ -106,11 +122,13 @@ function buildRekap(
     const totalTercatat = hadir + dinasLuar + dinasDalam + cuti + sakit + alpha + izin;
 
     console.log(
-      `${pegawai.cluster.padEnd(15)} | ${pegawai.nama_pegawai.padEnd(40)} | ` +
-      `H:${hadir.toString().padStart(2)} DL:${dinasLuar.toString().padStart(2)} DD:${dinasDalam.toString().padStart(2)} ` +
-      `C:${cuti.toString().padStart(2)} S:${sakit.toString().padStart(2)} A:${alpha.toString().padStart(2)} I:${izin.toString().padStart(2)} ` +
-      `| Total Kehadiran: ${totalKehadiran} | Tercatat: ${totalTercatat}/${totalHariKerja}`
+      `   Hasil: H:${hadir} DL:${dinasLuar} DD:${dinasDalam} C:${cuti} S:${sakit} A:${alpha} I:${izin}`
     );
+    console.log(`   Total Kehadiran: ${totalKehadiran} | Tercatat: ${totalTercatat}/${totalHariKerja}`);
+
+    if (totalTercatat < totalHariKerja) {
+      console.warn(`   ⚠️ MISSING ${totalHariKerja - totalTercatat} hari!`);
+    }
 
     rekap.push({
       pegawai,
@@ -156,45 +174,71 @@ function styleHeader(cell: ExcelJS.Cell, bgColor = YELLOW, textColor = BLACK) {
   applyBorder(cell);
 }
 
-const styleBody = (
-  cell: ExcelJS.Cell,
-  align: "left" | "center" = "center",
-  isTotal = false
-) => {
-  if (isTotal) {
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: SOFT_YELLOW },
-    };
-    cell.font = {
-      bold: true,
-      size: 11,
-      color: { argb: BLACK },
-    };
-  } else {
-    if (cell.value === "-") {
-      cell.font = {
-        size: 11,
-        color: { argb: "#FF94A3B8" },
-      };
-    } else {
-      cell.font = {
-        size: 11,
-        color: { argb: BLACK },
-      };
+// ✅ BUILD REKAP - SIMPLE & RELIABLE
+function buildRekap(
+  pegawaiList: Pegawai[],
+  absenList: Absen[],
+  tanggalMulai: string,
+  tanggalSelesai: string
+): RekapItem[] {
+  const totalHariKerja = countWorkingDays(tanggalMulai, tanggalSelesai);
+  const rekap: RekapItem[] = [];
+
+  console.log(`\n📊 Building Rekap - Total Hari Kerja: ${totalHariKerja}`);
+  console.log(`📊 Total Pegawai: ${pegawaiList.length}`);
+  console.log(`📊 Total Absen Records: ${absenList.length}`);
+  console.log(`📊 Periode: ${tanggalMulai} - ${tanggalSelesai}\n`);
+
+  for (const pegawai of pegawaiList) {
+    // ✅ DEBUG: Tampilkan semua data absen untuk pegawai ini
+    const pegawaiAbsenData = absenList.filter(a => a.pegawai_id === pegawai.id);
+    
+    console.log(`\n👤 ${pegawai.nama_pegawai} (ID: ${pegawai.id})`);
+    console.log(`   Total records: ${pegawaiAbsenData.length}`);
+    
+    // Group by keterangan untuk debug
+    const grouped = pegawaiAbsenData.reduce((acc, a) => {
+      acc[a.keterangan] = (acc[a.keterangan] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log(`   Breakdown:`, grouped);
+
+    const hadir = countAbsenByStatus(absenList, pegawai.id, "Hadir");
+    const dinasLuar = countAbsenByStatus(absenList, pegawai.id, "Dinas Luar");
+    const dinasDalam = countAbsenByStatus(absenList, pegawai.id, "Dinas Dalam");
+    const cuti = countAbsenByStatus(absenList, pegawai.id, "Cuti");
+    const sakit = countAbsenByStatus(absenList, pegawai.id, "Sakit");
+    const alpha = countAbsenByStatus(absenList, pegawai.id, "Alpha");
+    const izin = countAbsenByStatus(absenList, pegawai.id, "Izin");
+
+    const totalKehadiran = hadir + dinasLuar + dinasDalam;
+    const totalTercatat = hadir + dinasLuar + dinasDalam + cuti + sakit + alpha + izin;
+
+    console.log(
+      `   Hasil: H:${hadir} DL:${dinasLuar} DD:${dinasDalam} C:${cuti} S:${sakit} A:${alpha} I:${izin}`
+    );
+    console.log(`   Total Kehadiran: ${totalKehadiran} | Tercatat: ${totalTercatat}/${totalHariKerja}`);
+
+    if (totalTercatat < totalHariKerja) {
+      console.warn(`   ⚠️ MISSING ${totalHariKerja - totalTercatat} hari!`);
     }
+
+    rekap.push({
+      pegawai,
+      hadir,
+      dinasLuar,
+      dinasDalam,
+      cuti,
+      sakit,
+      alpha,
+      izin,
+      totalKehadiran,
+    });
   }
 
-  cell.alignment = {
-    horizontal: align,
-    vertical: "middle",
-    wrapText: true,
-  };
-
-  applyBorder(cell);
-};
-
+  return rekap;
+}
 async function imageUrlToBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url);
