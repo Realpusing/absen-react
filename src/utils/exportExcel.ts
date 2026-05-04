@@ -243,7 +243,6 @@ export async function exportToExcel({
   tanggalSelesai,
   penanggungJawab,
   jabatanPenanggungJawab,
-  hariKerja = 22,
   kolomAbsenList = [],
   absensiData = [],
   absensiKeteranganData = [],
