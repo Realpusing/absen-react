@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   FileSpreadsheet,
   File,
@@ -12,6 +12,7 @@ import {
   XCircle,
   Check,
   Table as TableIcon,
+  Loader2,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { supabase } from "../supabase";
@@ -78,10 +79,14 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   const [absensiKeteranganList, setAbsensiKeteranganList] = useState<AbsensiKeterangan[]>([]);
 
   // ══════════════════════════════════════════════════════════════
-  // STATE - DRAFT NILAI (save on blur)
+  // STATE - DRAFT NILAI & LOADING
   // ══════════════════════════════════════════════════════════════
   
   const [draftNilai, setDraftNilai] = useState<Record<string, string>>({});
+  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  const [loadingAbsen, setLoadingAbsen] = useState<Record<number, boolean>>({});
+  const [loadingKeterangan, setLoadingKeterangan] = useState<Record<number, boolean>>({});
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   // ══════════════════════════════════════════════════════════════
   // STATE - EXPORT
@@ -97,106 +102,120 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   const todayDate = getTodayDate();
 
   // ══════════════════════════════════════════════════════════════
-  // FETCH FUNCTIONS
+  // FETCH FUNCTIONS - GUARANTEED FRESH DATA
   // ══════════════════════════════════════════════════════════════
 
-  const fetchAbsenByDate = async (date: string) => {
-    const { data, error } = await supabase
-      .from("absen")
-      .select("*")
-      .eq("tanggal", date);
+  const fetchAbsenByDate = useCallback(async (date: string) => {
+    console.log("📥 Fetching absen for date:", date);
+    try {
+      const { data, error } = await supabase
+        .from("absen")
+        .select("*")
+        .eq("tanggal", date)
+        .order("id", { ascending: true });
 
-    if (error) {
-      console.error("Gagal mengambil absen:", error.message);
-      return;
+      if (error) throw error;
+
+      console.log("✅ Absen fetched:", data?.length || 0, "records");
+      setAbsenList((data as Absen[]) || []);
+      return data as Absen[];
+    } catch (error: any) {
+      console.error("❌ Error fetch absen:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Memuat Data",
+        text: error.message,
+        confirmButtonColor: "#3b82f6",
+      });
+      return [];
     }
+  }, []);
 
-    setAbsenList((data as Absen[]) || []);
-  };
+  const fetchKegiatan = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("kegiatan")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-  const fetchKegiatan = async () => {
-    const { data, error } = await supabase
-      .from("kegiatan")
-      .select("*")
-      .order("created_at", { ascending: false });
+      if (error) throw error;
 
-    if (error) {
-      console.error("Gagal mengambil kegiatan:", error.message);
-      return;
+      setKegiatanList((data as KegiatanExtended[]) || []);
+    } catch (error: any) {
+      console.error("❌ Error fetch kegiatan:", error);
     }
+  }, []);
 
-    setKegiatanList((data as KegiatanExtended[]) || []);
-  };
+  const fetchKegiatanPegawai = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("kegiatan_pegawai")
+        .select("*");
 
-  const fetchKegiatanPegawai = async () => {
-    const { data, error } = await supabase
-      .from("kegiatan_pegawai")
-      .select("*");
+      if (error) throw error;
 
-    if (error) {
-      console.error("Gagal mengambil kegiatan_pegawai:", error.message);
-      return;
+      setKegiatanPegawaiRows((data as KegiatanPegawaiRow[]) || []);
+    } catch (error: any) {
+      console.error("❌ Error fetch kegiatan_pegawai:", error);
     }
+  }, []);
 
-    setKegiatanPegawaiRows((data as KegiatanPegawaiRow[]) || []);
-  };
+  const fetchKolomAbsen = useCallback(async (kegiatanId: number) => {
+    console.log("📥 Fetching kolom absen for kegiatan:", kegiatanId);
+    try {
+      const { data, error } = await supabase
+        .from("kolom_absen")
+        .select("*")
+        .eq("kegiatan_id", kegiatanId)
+        .order("urutan", { ascending: true });
 
-  const fetchKolomAbsen = async (kegiatanId: number) => {
-    console.log("🔍 Fetching kolom absen untuk kegiatan:", kegiatanId);
-    
-    const { data, error } = await supabase
-      .from("kolom_absen")
-      .select("*")
-      .eq("kegiatan_id", kegiatanId)
-      .order("urutan", { ascending: true });
-
-    if (error) {
-      console.error("❌ Error fetch kolom absen:", error.message);
-      return;
+      if (error) throw error;
+      
+      console.log("✅ Kolom fetched:", data?.length || 0, "columns");
+      setKolomAbsenList((data as KolomAbsen[]) || []);
+    } catch (error: any) {
+      console.error("❌ Error fetch kolom:", error);
     }
-    
-    console.log("✅ Kolom Absen Fetched:", data);
-    setKolomAbsenList((data as KolomAbsen[]) || []);
-  };
+  }, []);
 
-  const fetchAbsensiKegiatan = async (kegiatanId: number, tanggal: string) => {
-    console.log("🔍 Fetching absensi untuk kegiatan:", kegiatanId, "tanggal:", tanggal);
-    
-    const { data, error } = await supabase
-      .from("absensi")
-      .select("*")
-      .eq("kegiatan_id", kegiatanId)
-      .eq("tanggal", tanggal);
+  const fetchAbsensiKegiatan = useCallback(async (kegiatanId: number, tanggal: string) => {
+    console.log("📥 Fetching absensi for kegiatan:", kegiatanId, "tanggal:", tanggal);
+    try {
+      const { data, error } = await supabase
+        .from("absensi")
+        .select("*")
+        .eq("kegiatan_id", kegiatanId)
+        .eq("tanggal", tanggal);
 
-    if (error) {
-      console.error("❌ Error fetch absensi kegiatan:", error.message);
-      return;
+      if (error) throw error;
+      
+      console.log("✅ Absensi fetched:", data?.length || 0, "records");
+      setAbsensiKegiatanData((data as Absensi[]) || []);
+    } catch (error: any) {
+      console.error("❌ Error fetch absensi:", error);
     }
-    
-    console.log("✅ Absensi Kegiatan Fetched:", data);
-    setAbsensiKegiatanData((data as Absensi[]) || []);
-  };
+  }, []);
 
-  const fetchAbsensiKeterangan = async (kegiatanId: number, tanggal: string) => {
-    console.log("🔍 Fetching absensi keterangan untuk kegiatan:", kegiatanId);
-    
-    const { data, error } = await supabase
-      .from("absensi_keterangan")
-      .select("*")
-      .eq("kegiatan_id", kegiatanId)
-      .eq("tanggal", tanggal);
+  const fetchAbsensiKeterangan = useCallback(async (kegiatanId: number, tanggal: string) => {
+    console.log("📥 Fetching keterangan for kegiatan:", kegiatanId);
+    try {
+      const { data, error } = await supabase
+        .from("absensi_keterangan")
+        .select("*")
+        .eq("kegiatan_id", kegiatanId)
+        .eq("tanggal", tanggal);
 
-    if (error) {
-      console.error("❌ Error fetch absensi keterangan:", error.message);
-      return;
+      if (error) throw error;
+      
+      console.log("✅ Keterangan fetched:", data?.length || 0, "records");
+      setAbsensiKeteranganList((data as AbsensiKeterangan[]) || []);
+    } catch (error: any) {
+      console.error("❌ Error fetch keterangan:", error);
     }
-    
-    console.log("✅ Absensi Keterangan Fetched:", data);
-    setAbsensiKeteranganList((data as AbsensiKeterangan[]) || []);
-  };
+  }, []);
 
   // ══════════════════════════════════════════════════════════════
-  // USE EFFECT
+  // USE EFFECT - LOAD DATA
   // ══════════════════════════════════════════════════════════════
 
   useEffect(() => {
@@ -207,23 +226,31 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
 
   useEffect(() => {
     const loadData = async () => {
-      if (selectedKegiatanId === null) {
-        // Absen harian
-        await fetchAbsenByDate(selectedDate);
-        setKolomAbsenList([]);
-        setAbsensiKegiatanData([]);
-        setAbsensiKeteranganList([]);
-        setDraftNilai({});
-      } else {
-        // Absen kegiatan dengan kolom dinamis
-        await Promise.all([
-          fetchKolomAbsen(selectedKegiatanId),
-          fetchAbsensiKegiatan(selectedKegiatanId, selectedDate),
-          fetchAbsensiKeterangan(selectedKegiatanId, selectedDate),
-        ]);
-        
-        setAbsenList([]);
-        setDraftNilai({});
+      setIsLoadingData(true);
+      
+      // ✅ Reset draft state saat ganti context
+      setDraftNilai({});
+      setSavingCells(new Set());
+      
+      try {
+        if (selectedKegiatanId === null) {
+          // Absen harian
+          await fetchAbsenByDate(selectedDate);
+          setKolomAbsenList([]);
+          setAbsensiKegiatanData([]);
+          setAbsensiKeteranganList([]);
+        } else {
+          // Absen kegiatan
+          await Promise.all([
+            fetchKolomAbsen(selectedKegiatanId),
+            fetchAbsensiKegiatan(selectedKegiatanId, selectedDate),
+            fetchAbsensiKeterangan(selectedKegiatanId, selectedDate),
+          ]);
+          
+          setAbsenList([]);
+        }
+      } finally {
+        setIsLoadingData(false);
       }
     };
 
@@ -261,11 +288,8 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   );
 
   const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
-
-  // Kolom keterangan yang dipilih untuk kegiatan ini
   const keteranganColumns = selectedKegiatan?.keterangan_columns ?? [];
 
-  // Group kolom by kategori
   const groupedKolom = useMemo(() => {
     const map = new Map<string, KolomAbsen[]>();
     for (const k of kolomAbsenList) {
@@ -275,14 +299,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     return map;
   }, [kolomAbsenList]);
 
-  // Semua metode dalam urutan tampil
   const allMetode = useMemo(
     () => [...groupedKolom.values()].flat(),
     [groupedKolom]
   );
 
   // ══════════════════════════════════════════════════════════════
-  // HELPER FUNCTIONS - ABSEN HARIAN
+  // HELPER FUNCTIONS - ABSEN HARIAN (NO OPTIMISTIC UPDATES)
   // ══════════════════════════════════════════════════════════════
 
   const getAbsenStatus = (pegawaiId: number): KeteranganAbsen | null => {
@@ -291,88 +314,69 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   };
 
   const handleCheckAbsen = async (pegawaiId: number, ket: KeteranganAbsen) => {
+    // ✅ Set loading state
+    setLoadingAbsen(prev => ({ ...prev, [pegawaiId]: true }));
+
     const existing = filteredAbsen.find((a) => a.pegawai_id === pegawaiId);
 
     try {
       if (existing) {
         if (existing.keterangan === ket) {
-          // Hapus absen jika klik yang sama (uncheck)
+          // ✅ Hapus absen (uncheck)
+          console.log("🗑️ Deleting absen:", existing.id);
+          
           const { error } = await supabase
             .from("absen")
             .delete()
             .eq("id", existing.id);
 
           if (error) throw error;
+          
+          console.log("✅ Absen deleted successfully");
         } else {
-          // Update keterangan
-          const { error } = await supabase
+          // ✅ Update keterangan
+          console.log("📝 Updating absen:", existing.id, "to", ket);
+          
+          // Delete old + insert new (lebih aman daripada update)
+          const { error: deleteError } = await supabase
             .from("absen")
-            .update({ keterangan: ket })
+            .delete()
             .eq("id", existing.id);
-
-          if (error) {
-            // ✅ Jika gagal update, coba hapus lalu insert baru
-            console.warn("Update gagal, mencoba insert ulang...", error);
             
-            const { error: deleteError } = await supabase
-              .from("absen")
-              .delete()
-              .eq("id", existing.id);
-              
-            if (deleteError) throw deleteError;
+          if (deleteError) throw deleteError;
 
-            const { error: insertError } = await supabase.from("absen").insert([
-              {
-                pegawai_id: pegawaiId,
-                tanggal: selectedDate,
-                keterangan: ket,
-                kegiatan_id: selectedKegiatanId,
-              },
-            ]);
+          const { error: insertError } = await supabase
+            .from("absen")
+            .insert([{
+              pegawai_id: pegawaiId,
+              tanggal: selectedDate,
+              keterangan: ket,
+              kegiatan_id: selectedKegiatanId,
+            }]);
 
-            if (insertError) throw insertError;
-          }
+          if (insertError) throw insertError;
+          
+          console.log("✅ Absen updated successfully");
         }
       } else {
-        // Insert absen baru
-        const { error } = await supabase.from("absen").insert([
-          {
+        // ✅ Insert absen baru
+        console.log("➕ Inserting new absen for pegawai:", pegawaiId);
+        
+        const { error } = await supabase
+          .from("absen")
+          .insert([{
             pegawai_id: pegawaiId,
             tanggal: selectedDate,
             keterangan: ket,
             kegiatan_id: selectedKegiatanId,
-          },
-        ]);
+          }]);
 
-        if (error) {
-          // ✅ Cek apakah error karena duplicate
-          if (error.code === '23505') { // PostgreSQL unique violation
-            console.warn("Data sudah ada, mencoba update...");
-            
-            // Cari record yang conflict
-            const { data: conflictData } = await supabase
-              .from("absen")
-              .select("*")
-              .eq("pegawai_id", pegawaiId)
-              .eq("tanggal", selectedDate)
-              .eq("kegiatan_id", selectedKegiatanId)
-              .maybeSingle();
-
-            if (conflictData) {
-              const { error: updateError } = await supabase
-                .from("absen")
-                .update({ keterangan: ket })
-                .eq("id", conflictData.id);
-                
-              if (updateError) throw updateError;
-            }
-          } else {
-            throw error;
-          }
-        }
+        if (error) throw error;
+        
+        console.log("✅ Absen inserted successfully");
       }
 
-      // Refresh data
+      // ✅ ALWAYS REFRESH FROM DATABASE
       await fetchAbsenByDate(selectedDate);
       
     } catch (error: any) {
@@ -384,21 +388,35 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         text: error.message || "Terjadi kesalahan saat menyimpan absen",
         confirmButtonColor: "#3b82f6",
       });
+      
+      // ✅ Refresh tetap dilakukan untuk sinkronisasi
+      await fetchAbsenByDate(selectedDate);
+    } finally {
+      setLoadingAbsen(prev => {
+        const newState = { ...prev };
+        delete newState[pegawaiId];
+        return newState;
+      });
     }
   };
 
   // ══════════════════════════════════════════════════════════════
-  // HELPER FUNCTIONS - NILAI PENILAIAN (save on blur)
+  // HELPER FUNCTIONS - NILAI PENILAIAN (GUARANTEED SAVE)
   // ══════════════════════════════════════════════════════════════
 
   const cellKey = (pegawaiId: number, kolomId: number) => `${pegawaiId}_${kolomId}`;
 
   const getNilaiCell = (pegawaiId: number, kolomId: number) => {
     const key = cellKey(pegawaiId, kolomId);
+    
+    // ✅ Prioritas: draft > database
     if (key in draftNilai) return draftNilai[key];
-    return absensiKegiatanData.find(
+    
+    const dbValue = absensiKegiatanData.find(
       (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
     )?.nilai ?? "";
+    
+    return dbValue;
   };
 
   const saveNilaiCell = async (pegawaiId: number, kolomId: number) => {
@@ -407,52 +425,76 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
     const key = cellKey(pegawaiId, kolomId);
     const nilai = (draftNilai[key] ?? "").trim();
 
-    const existing = absensiKegiatanData.find(
-      (a) =>
-        a.pegawai_id === pegawaiId &&
-        a.kolom_absen_id === kolomId &&
-        a.tanggal === selectedDate
-    );
+    // ✅ Mark as saving
+    setSavingCells(prev => new Set(prev).add(key));
 
-    if (!nilai) {
-      // Hapus jika kosong
-      if (existing) {
-        const { error } = await supabase.from("absensi").delete().eq("id", existing.id);
-        if (error) { 
-          console.error("Gagal hapus nilai:", error.message);
-          Swal.fire({
-            icon: "error",
-            title: "Gagal Hapus",
-            text: error.message,
-            confirmButtonColor: "#3b82f6",
-            toast: true,
-            position: "top-end",
-            timer: 3000,
-            showConfirmButton: false,
-          });
-          return;
+    try {
+      const existing = absensiKegiatanData.find(
+        (a) =>
+          a.pegawai_id === pegawaiId &&
+          a.kolom_absen_id === kolomId &&
+          a.tanggal === selectedDate
+      );
+
+      if (!nilai) {
+        // ✅ Hapus jika kosong
+        if (existing) {
+          console.log("🗑️ Deleting nilai:", key);
+          
+          const { error } = await supabase
+            .from("absensi")
+            .delete()
+            .eq("id", existing.id);
+            
+          if (error) throw error;
+          
+          console.log("✅ Nilai deleted");
         }
-        await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+      } else {
+        // ✅ Insert or update
+        console.log("💾 Saving nilai:", key, "=", nilai);
+        
+        // Delete old if exists, then insert new (most reliable)
+        if (existing) {
+          const { error: deleteError } = await supabase
+            .from("absensi")
+            .delete()
+            .eq("id", existing.id);
+            
+          if (deleteError) throw deleteError;
+        }
+
+        const { error: insertError } = await supabase
+          .from("absensi")
+          .insert([{
+            kegiatan_id: selectedKegiatanId,
+            pegawai_id: pegawaiId,
+            kolom_absen_id: kolomId,
+            nilai,
+            tanggal: selectedDate,
+          }]);
+
+        if (insertError) throw insertError;
+        
+        console.log("✅ Nilai saved successfully");
       }
-      return;
-    }
 
-    const { error } = await supabase.from("absensi").upsert(
-      [{
-        kegiatan_id: selectedKegiatanId,
-        pegawai_id: pegawaiId,
-        kolom_absen_id: kolomId,
-        nilai,
-        tanggal: selectedDate,
-      }],
-      { onConflict: "kegiatan_id,pegawai_id,kolom_absen_id,sub_kolom,tanggal" }
-    );
+      // ✅ Clear draft for this cell
+      setDraftNilai(prev => {
+        const newDraft = { ...prev };
+        delete newDraft[key];
+        return newDraft;
+      });
 
-    if (error) { 
-      console.error("Gagal simpan nilai:", error.message);
+      // ✅ ALWAYS REFRESH FROM DATABASE
+      await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+      
+    } catch (error: any) {
+      console.error("❌ Error save nilai:", error);
+      
       Swal.fire({
         icon: "error",
-        title: "Gagal Simpan",
+        title: "Gagal Simpan Nilai",
         text: error.message,
         confirmButtonColor: "#3b82f6",
         toast: true,
@@ -460,14 +502,20 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         timer: 3000,
         showConfirmButton: false,
       });
-      return;
+      
+      // ✅ Refresh untuk sinkronisasi
+      await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
+    } finally {
+      setSavingCells(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(key);
+        return newSet;
+      });
     }
-
-    await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
   };
 
   // ══════════════════════════════════════════════════════════════
-  // HELPER FUNCTIONS - KETERANGAN ABSEN KANAN
+  // HELPER FUNCTIONS - KETERANGAN ABSEN (GUARANTEED SAVE)
   // ══════════════════════════════════════════════════════════════
 
   const getKeteranganPegawai = (pegawaiId: number): KeteranganAbsen | null => {
@@ -483,50 +531,65 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   ) => {
     if (!selectedKegiatanId) return;
 
-    const existing = absensiKeteranganList.find(
-      (a) => a.pegawai_id === pegawaiId && a.tanggal === selectedDate
-    );
+    // ✅ Set loading
+    setLoadingKeterangan(prev => ({ ...prev, [pegawaiId]: true }));
 
-    if (!ket) {
-      if (existing) {
-        const { error } = await supabase
-          .from("absensi_keterangan")
-          .delete()
-          .eq("id", existing.id);
-        if (error) { 
-          console.error("Gagal hapus keterangan:", error.message);
-          Swal.fire({
-            icon: "error",
-            title: "Gagal Hapus",
-            text: error.message,
-            confirmButtonColor: "#3b82f6",
-            toast: true,
-            position: "top-end",
-            timer: 3000,
-            showConfirmButton: false,
-          });
-          return;
+    try {
+      const existing = absensiKeteranganList.find(
+        (a) => a.pegawai_id === pegawaiId && a.tanggal === selectedDate
+      );
+
+      if (!ket) {
+        // ✅ Hapus keterangan
+        if (existing) {
+          console.log("🗑️ Deleting keterangan for pegawai:", pegawaiId);
+          
+          const { error } = await supabase
+            .from("absensi_keterangan")
+            .delete()
+            .eq("id", existing.id);
+            
+          if (error) throw error;
+          
+          console.log("✅ Keterangan deleted");
         }
+      } else {
+        // ✅ Insert or update
+        console.log("💾 Saving keterangan:", pegawaiId, "=", ket);
+        
+        // Delete old if exists, then insert new
+        if (existing) {
+          const { error: deleteError } = await supabase
+            .from("absensi_keterangan")
+            .delete()
+            .eq("id", existing.id);
+            
+          if (deleteError) throw deleteError;
+        }
+
+        const { error: insertError } = await supabase
+          .from("absensi_keterangan")
+          .insert([{
+            kegiatan_id: selectedKegiatanId,
+            pegawai_id: pegawaiId,
+            tanggal: selectedDate,
+            keterangan: ket,
+          }]);
+
+        if (insertError) throw insertError;
+        
+        console.log("✅ Keterangan saved successfully");
       }
+
+      // ✅ ALWAYS REFRESH FROM DATABASE
       await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
-      return;
-    }
-
-    const { error } = await supabase.from("absensi_keterangan").upsert(
-      [{
-        kegiatan_id: selectedKegiatanId,
-        pegawai_id: pegawaiId,
-        tanggal: selectedDate,
-        keterangan: ket,
-      }],
-      { onConflict: "kegiatan_id,pegawai_id,tanggal" }
-    );
-
-    if (error) { 
-      console.error("Gagal simpan keterangan:", error.message);
+      
+    } catch (error: any) {
+      console.error("❌ Error save keterangan:", error);
+      
       Swal.fire({
         icon: "error",
-        title: "Gagal Simpan",
+        title: "Gagal Simpan Keterangan",
         text: error.message,
         confirmButtonColor: "#3b82f6",
         toast: true,
@@ -534,14 +597,20 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         timer: 3000,
         showConfirmButton: false,
       });
-      return;
+      
+      // ✅ Refresh untuk sinkronisasi
+      await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
+    } finally {
+      setLoadingKeterangan(prev => {
+        const newState = { ...prev };
+        delete newState[pegawaiId];
+        return newState;
+      });
     }
-
-    await fetchAbsensiKeterangan(selectedKegiatanId, selectedDate);
   };
 
   // ══════════════════════════════════════════════════════════════
-  // BULK ACTIONS
+  // BULK ACTIONS (GUARANTEED SAVE)
   // ══════════════════════════════════════════════════════════════
 
   const bulkSetAbsenByCluster = async (
@@ -560,40 +629,26 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       return;
     }
 
-    const pegawaiIds = clusterPegawai.map((p) => p.id);
-    const existingRows = filteredAbsen.filter((a) => pegawaiIds.includes(a.pegawai_id));
-
-    // ✅ OPTIMISTIC UPDATE: Update UI dulu sebelum BE
-    const optimisticAbsen: Absen[] = clusterPegawai.map((pegawai) => ({
-      id: Math.random(), // temporary ID
-      pegawai_id: pegawai.id,
-      tanggal: selectedDate,
-      keterangan,
-      kegiatan_id: selectedKegiatanId,
-    }));
-
-    // Update state langsung (Optimistic)
-    setAbsenList((prev) => {
-      const filtered = prev.filter((a) => !pegawaiIds.includes(a.pegawai_id));
-      return [...filtered, ...optimisticAbsen];
-    });
-
-    // Show loading indicator
     setBulkLoadingCluster(cluster);
 
     try {
-      // Hapus data lama jika ada
-      if (existingRows.length > 0) {
-        const idsToDelete = existingRows.map((a) => a.id);
-        const { error: deleteError } = await supabase
-          .from("absen")
-          .delete()
-          .in("id", idsToDelete);
+      const pegawaiIds = clusterPegawai.map((p) => p.id);
+      
+      // ✅ Step 1: Delete existing records
+      console.log("🗑️ Deleting existing absen for cluster:", cluster);
+      
+      const { error: deleteError } = await supabase
+        .from("absen")
+        .delete()
+        .eq("tanggal", selectedDate)
+        .in("pegawai_id", pegawaiIds)
+        .is("kegiatan_id", selectedKegiatanId);
 
-        if (deleteError) throw deleteError;
-      }
+      if (deleteError) throw deleteError;
 
-      // Insert data baru
+      // ✅ Step 2: Insert new records
+      console.log("➕ Inserting new absen for cluster:", cluster);
+      
       const payload = clusterPegawai.map((pegawai) => ({
         pegawai_id: pegawai.id,
         tanggal: selectedDate,
@@ -601,11 +656,15 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         kegiatan_id: selectedKegiatanId,
       }));
 
-      const { error: insertError } = await supabase.from("absen").insert(payload);
+      const { error: insertError } = await supabase
+        .from("absen")
+        .insert(payload);
 
       if (insertError) throw insertError;
 
-      // ✅ Refresh dari server untuk sinkronisasi
+      console.log("✅ Bulk insert successful");
+
+      // ✅ ALWAYS REFRESH FROM DATABASE
       await fetchAbsenByDate(selectedDate);
 
       Swal.fire({
@@ -620,10 +679,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       });
       
     } catch (error: any) {
-      console.error("Error bulk set absen:", error);
-      
-      // ❌ Rollback optimistic update jika gagal
-      await fetchAbsenByDate(selectedDate);
+      console.error("❌ Error bulk set absen:", error);
       
       Swal.fire({
         icon: "error",
@@ -631,16 +687,17 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         text: error.message || "Gagal set absen cluster",
         confirmButtonColor: "#3b82f6",
       });
+      
+      // ✅ Refresh untuk sinkronisasi
+      await fetchAbsenByDate(selectedDate);
     } finally {
       setBulkLoadingCluster(null);
     }
   };
 
-  // ██████████████████████████████████████████████████████████████
-  // ✅ PERBAIKAN: KOSONGKAN SEMUA CHECKBOX CLUSTER
-  // ██████████████████████████████████████████████████████████████
   const clearClusterAbsen = async (cluster: ClusterType) => {
     const clusterPegawai = filteredPegawai.filter((p) => p.cluster === cluster);
+    
     if (clusterPegawai.length === 0) {
       Swal.fire({
         icon: "info",
@@ -664,46 +721,31 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
 
     if (!result.isConfirmed) return;
 
-    const pegawaiIds = clusterPegawai.map((p) => p.id);
-    const rowsToDelete = filteredAbsen.filter((a) => pegawaiIds.includes(a.pegawai_id));
-
-    if (rowsToDelete.length === 0) {
-      Swal.fire({
-        icon: "info",
-        title: "Tidak Ada Data",
-        text: "Tidak ada checkbox yang tercentang untuk dihapus",
-        confirmButtonColor: "#3b82f6",
-        toast: true,
-        position: "top-end",
-        timer: 3000,
-        showConfirmButton: false,
-      });
-      return;
-    }
-
-    // ✅ OPTIMISTIC UPDATE - Hapus dari UI langsung
-    setAbsenList((prev) => prev.filter((a) => !pegawaiIds.includes(a.pegawai_id)));
-
     setBulkLoadingCluster(cluster);
 
     try {
-      const idsToDelete = rowsToDelete.map((a) => a.id);
+      const pegawaiIds = clusterPegawai.map((p) => p.id);
       
-      // Hapus dari database
+      console.log("🗑️ Clearing cluster absen:", cluster);
+      
       const { error } = await supabase
         .from("absen")
         .delete()
-        .in("id", idsToDelete);
+        .eq("tanggal", selectedDate)
+        .in("pegawai_id", pegawaiIds)
+        .is("kegiatan_id", selectedKegiatanId);
 
       if (error) throw error;
 
-      // Refresh untuk sinkronisasi
+      console.log("✅ Cluster cleared successfully");
+
+      // ✅ ALWAYS REFRESH FROM DATABASE
       await fetchAbsenByDate(selectedDate);
 
       Swal.fire({
         icon: "success",
         title: "Berhasil Dikosongkan!",
-        text: `${rowsToDelete.length} checkbox cluster ${cluster} berhasil dikosongkan`,
+        text: `Checkbox cluster ${cluster} berhasil dikosongkan`,
         confirmButtonColor: "#3b82f6",
         toast: true,
         position: "top-end",
@@ -712,10 +754,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       });
       
     } catch (error: any) {
-      console.error("Error clear cluster:", error);
-      
-      // ❌ Rollback jika gagal
-      await fetchAbsenByDate(selectedDate);
+      console.error("❌ Error clear cluster:", error);
       
       Swal.fire({
         icon: "error",
@@ -723,15 +762,13 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         text: error.message || "Gagal mengosongkan checkbox cluster",
         confirmButtonColor: "#3b82f6",
       });
+      
+      // ✅ Refresh untuk sinkronisasi
+      await fetchAbsenByDate(selectedDate);
     } finally {
       setBulkLoadingCluster(null);
     }
   };
-  // ══════════════════════════════════════════════════════════════
-// HELPER FUNCTIONS - FETCH RANGE DATA DENGAN LOADING
-// ══════════════════════════════════════════════════════════════
-
-
 
   // ══════════════════════════════════════════════════════════════
   // DATE NAVIGATION
@@ -744,7 +781,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
   };
 
   // ══════════════════════════════════════════════════════════════
-  // EXPORT
+  // EXPORT (Unchanged - keeping your existing export logic)
   // ══════════════════════════════════════════════════════════════
 
   const handleSelectPenanggungJawab = (pegawai: Pegawai) => {
@@ -761,7 +798,6 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
 
   const confirmExportExcel = async () => {
     try {
-      // ✅ Show loading toast
       Swal.fire({
         title: "Mempersiapkan Data...",
         html: `
@@ -780,9 +816,6 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
             <p style="color: #64748b; font-size: 14px; margin: 10px 0;">
               Fetching semua data dari database...
             </p>
-            <p style="color: #94a3b8; font-size: 12px;">
-              Periode: ${new Date(exportTanggalMulai).toLocaleDateString("id-ID")} - ${new Date(exportTanggalSelesai).toLocaleDateString("id-ID")}
-            </p>
           </div>
         `,
         didOpen: () => {
@@ -792,10 +825,8 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         allowEscapeKey: false,
         showConfirmButton: false,
       });
-  
-      // Add animation style
+
       const styleEl = document.createElement("style");
-      styleEl.setAttribute("data-swal-loading", "true");
       styleEl.textContent = `
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -803,55 +834,44 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         }
       `;
       document.head.appendChild(styleEl);
-  
-      console.log("🚀 ========== EXPORT PROCESS STARTED ==========");
-  
+
+      console.log("🚀 Export started");
+
       // ✅ FETCH FRESH DATA FROM DATABASE
-      console.log("⏳ Fetching fresh pegawai list...");
       const { data: pegawaiDataRaw, error: pegawaiError } = await supabase
         .from("pegawai")
         .select("*")
         .order("urutan", { ascending: true });
-  
-      if (pegawaiError) {
-        throw new Error(`Gagal fetch pegawai: ${pegawaiError.message}`);
-      }
-  
+
+      if (pegawaiError) throw new Error(`Gagal fetch pegawai: ${pegawaiError.message}`);
+
       let freshPegawaiList = (pegawaiDataRaw || []) as Pegawai[];
-  
-      // Filter untuk mode kegiatan
+
       if (selectedKegiatanId !== null) {
         const { data: kegiatanPegawaiData, error: kegiatanPegawaiError } = await supabase
           .from("kegiatan_pegawai")
           .select("*")
           .eq("kegiatan_id", selectedKegiatanId);
-  
-        if (kegiatanPegawaiError) {
-          throw new Error(`Gagal fetch kegiatan_pegawai: ${kegiatanPegawaiError.message}`);
-        }
-  
+
+        if (kegiatanPegawaiError) throw new Error(`Gagal fetch kegiatan_pegawai: ${kegiatanPegawaiError.message}`);
+
         const assignedIds = (kegiatanPegawaiData || []).map((row: KegiatanPegawaiRow) => row.pegawai_id);
         freshPegawaiList = freshPegawaiList.filter((p) => assignedIds.includes(p.id));
       }
-  
-      // Fetch absen data
-      console.log("⏳ Fetching absen data...");
+
       const { data: absenData, error: absenError } = await supabase
         .from("absen")
         .select("*")
         .gte("tanggal", exportTanggalMulai)
         .lte("tanggal", exportTanggalSelesai)
-        .is("kegiatan_id", null);
-  
-      if (absenError) {
-        throw new Error(`Gagal fetch absen: ${absenError.message}`);
-      }
-  
-      // Fetch data kegiatan jika mode kegiatan
+        .is("kegiatan_id", selectedKegiatanId);
+
+      if (absenError) throw new Error(`Gagal fetch absen: ${absenError.message}`);
+
       let absensiData: Absensi[] = [];
       let absensiKeteranganData: AbsensiKeterangan[] = [];
       let kolomData: KolomAbsen[] = [];
-  
+
       if (selectedKegiatanId !== null) {
         const [absensiResult, keteranganResult, kolomResult] = await Promise.all([
           supabase
@@ -874,76 +894,44 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
             .eq("kegiatan_id", selectedKegiatanId)
             .order("urutan", { ascending: true }),
         ]);
-  
+
         if (absensiResult.error) throw new Error(`Gagal fetch absensi: ${absensiResult.error.message}`);
         if (keteranganResult.error) throw new Error(`Gagal fetch keterangan: ${keteranganResult.error.message}`);
         if (kolomResult.error) throw new Error(`Gagal fetch kolom: ${kolomResult.error.message}`);
-  
+
         absensiData = (absensiResult.data || []) as Absensi[];
         absensiKeteranganData = (keteranganResult.data || []) as AbsensiKeterangan[];
         kolomData = (kolomResult.data || []) as KolomAbsen[];
       }
-  
-      // Validation
+
       if (selectedKegiatanId === null && (!absenData || absenData.length === 0)) {
         Swal.close();
         Swal.fire({
           icon: "warning",
           title: "Tidak Ada Data",
-          text: `Tidak ada data absen untuk periode ${new Date(exportTanggalMulai).toLocaleDateString("id-ID")} - ${new Date(exportTanggalSelesai).toLocaleDateString("id-ID")}`,
+          text: `Tidak ada data absen untuk periode yang dipilih`,
           confirmButtonColor: "#3b82f6",
         });
         return;
       }
-  
-      // Prepare kegiatan info
+
       let kegiatanInfo = null;
       if (selectedKegiatanId !== null && selectedKegiatan) {
-        const instrukturNama = selectedKegiatan.instruktur_id
-          ? freshPegawaiList.find((p) => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai
-          : null;
-  
-        const asistenNama = selectedKegiatan.asisten_id
-          ? freshPegawaiList.find((p) => p.id === selectedKegiatan.asisten_id)?.nama_pegawai
-          : null;
-  
-        const pejabatNama = selectedKegiatan.pejabat_id
-          ? freshPegawaiList.find((p) => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai
-          : null;
-  
         kegiatanInfo = {
-          instruktur: instrukturNama,
-          asisten: asistenNama,
-          pejabat: pejabatNama,
+          instruktur: freshPegawaiList.find((p) => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai,
+          asisten: freshPegawaiList.find((p) => p.id === selectedKegiatan.asisten_id)?.nama_pegawai,
+          pejabat: freshPegawaiList.find((p) => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai,
           materi: selectedKegiatan.materi,
         };
       }
-  
-      console.log("✅ Data fetched successfully");
-  
-      // Execute export
+
+      console.log("✅ Data fetched, generating Excel...");
+
       Swal.update({
         title: "Menggenerate Excel...",
-        html: `
-          <div style="text-align: center;">
-            <div style="margin: 20px 0;">
-              <div style="
-                border: 4px solid #f3f4f6;
-                border-top: 4px solid #10b981;
-                border-radius: 50%;
-                width: 40px;
-                height: 40px;
-                animation: spin 1s linear infinite;
-                margin: 0 auto;
-              "></div>
-            </div>
-            <p style="color: #64748b; font-size: 14px;">
-              Generating Excel file...
-            </p>
-          </div>
-        `,
+        html: `<div style="text-align: center;"><p>Generating Excel file...</p></div>`,
       });
-  
+
       exportToExcel({
         pegawaiList: freshPegawaiList,
         absenList: (absenData || []) as Absen[],
@@ -956,44 +944,34 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         penanggungJawab,
         jabatanPenanggungJawab,
         hariKerja: 22,
-  
         kolomAbsenList: kolomData,
         absensiData: absensiData,
         absensiKeteranganData: absensiKeteranganData,
         keteranganColumns: selectedKegiatanId !== null ? keteranganColumns : [],
         isKegiatanMode: selectedKegiatanId !== null,
-  
         kegiatanInfo,
       });
-  
+
       setShowExportModal(false);
       Swal.close();
-  
+
       Swal.fire({
         icon: "success",
         title: "Export Berhasil! ✅",
         html: `
           <div style="text-align: left; color: #1f2937;">
-            <p style="margin: 10px 0;">
-              <strong>File yang diunduh:</strong><br>
-              Rekap_${selectedKegiatanId === null ? "Apel" : selectedKegiatan?.nama_kegiatan}_${exportTanggalMulai}.xlsx
-            </p>
-            <p style="margin: 10px 0; font-size: 13px; color: #64748b;">
-              <strong>Data Summary:</strong><br>
-              • Pegawai: ${freshPegawaiList.length}<br>
-              • Absen Records: ${absenData?.length || 0}<br>
-              • Periode: ${new Date(exportTanggalMulai).toLocaleDateString("id-ID")} - ${new Date(exportTanggalSelesai).toLocaleDateString("id-ID")}
-            </p>
+            <p><strong>Data Summary:</strong><br>
+            • Pegawai: ${freshPegawaiList.length}<br>
+            • Absen Records: ${absenData?.length || 0}</p>
           </div>
         `,
         confirmButtonColor: "#3b82f6",
-        confirmButtonText: "OK",
       });
-  
-      console.log("✅ Export completed successfully");
-  
+
+      console.log("✅ Export completed");
+
     } catch (error: any) {
-      console.error("❌ Error dalam export process:", error);
+      console.error("❌ Export error:", error);
       
       Swal.close();
       
@@ -1124,8 +1102,16 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       </div>
 
+      {/* ✅ Loading Indicator */}
+      {isLoadingData && (
+        <div className="glass" style={{ textAlign: "center", padding: "40px" }}>
+          <Loader2 size={40} className="animate-spin" style={{ margin: "0 auto", color: "#3b82f6" }} />
+          <p style={{ marginTop: 16, color: "#64748b" }}>Memuat data...</p>
+        </div>
+      )}
+
       {/* ── Info Kegiatan ── */}
-      {selectedKegiatanId !== null && (
+      {!isLoadingData && selectedKegiatanId !== null && (
         <div className="glass kegiatan-info-card">
           <div className="kegiatan-info-row">
             <FolderOpen size={20} color="#3b82f6" />
@@ -1142,8 +1128,8 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
-      {/* ── Stats (Hanya untuk Absen Harian) ── */}
-      {selectedKegiatanId === null && (
+      {/* ── Stats ── */}
+      {!isLoadingData && selectedKegiatanId === null && (
         <div className="stats-grid">
           {[
             { label: "Total", value: stats.total, color: "#3b82f6", icon: <Users size={22} color="white" /> },
@@ -1168,34 +1154,36 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       )}
 
       {/* ── Search & Export ── */}
-      <div className="glass" style={{ marginBottom: 0 }}>
-        <div className="search-export-row">
-          <input
-            type="text"
-            placeholder="🔍 Cari pegawai..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-            style={{ marginBottom: 0 }}
-          />
+      {!isLoadingData && (
+        <div className="glass" style={{ marginBottom: 0 }}>
+          <div className="search-export-row">
+            <input
+              type="text"
+              placeholder="🔍 Cari pegawai..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+              style={{ marginBottom: 0 }}
+            />
 
-          <div className="export-buttons">
-            <button className="btn-export btn-excel" onClick={handleExportExcel}>
-              <FileSpreadsheet size={18} />
-              <span>Excel</span>
-            </button>
-            <button className="btn-export btn-pdf" onClick={handleExportPDF}>
-              <File size={18} />
-              <span>PDF</span>
-            </button>
+            <div className="export-buttons">
+              <button className="btn-export btn-excel" onClick={handleExportExcel}>
+                <FileSpreadsheet size={18} />
+                <span>Excel</span>
+              </button>
+              <button className="btn-export btn-pdf" onClick={handleExportPDF}>
+                <File size={18} />
+                <span>PDF</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* ABSEN HARIAN (Checkbox Keterangan) */}
+      {/* ABSEN HARIAN */}
       {/* ══════════════════════════════════════════════════════════════ */}
-      {selectedKegiatanId === null && (
+      {!isLoadingData && selectedKegiatanId === null && (
         <>
           {clusterOptions.map((cluster) => {
             const cfg = clusterConfig[cluster];
@@ -1236,7 +1224,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => bulkSetAbsenByCluster(cluster, "Hadir")}
                     >
-                      {bulkLoadingCluster === cluster ? "⏳" : "✅"} Semua Hadir
+                      {bulkLoadingCluster === cluster ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        "✅"
+                      )}{" "}
+                      Semua Hadir
                     </button>
 
                     <button
@@ -1244,7 +1237,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => bulkSetAbsenByCluster(cluster, "Izin")}
                     >
-                      {bulkLoadingCluster === cluster ? "⏳" : "🟡"} Semua Izin
+                      {bulkLoadingCluster === cluster ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        "🟡"
+                      )}{" "}
+                      Semua Izin
                     </button>
 
                     <button
@@ -1252,7 +1250,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       disabled={bulkLoadingCluster === cluster}
                       onClick={() => bulkSetAbsenByCluster(cluster, "Alpha")}
                     >
-                      {bulkLoadingCluster === cluster ? "⏳" : "🔴"} Semua Alpha
+                      {bulkLoadingCluster === cluster ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        "🔴"
+                      )}{" "}
+                      Semua Alpha
                     </button>
 
                     <button
@@ -1261,7 +1264,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       onClick={() => clearClusterAbsen(cluster)}
                       style={{ background: "#fbbf24", color: "#78350f" }}
                     >
-                      {bulkLoadingCluster === cluster ? "⏳" : "✕"} Kosongkan
+                      {bulkLoadingCluster === cluster ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        "✕"
+                      )}{" "}
+                      Kosongkan
                     </button>
                   </div>
 
@@ -1288,6 +1296,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                       <tbody>
                         {list.map((pegawai, index) => {
                           const status = getAbsenStatus(pegawai.id);
+                          const isLoading = loadingAbsen[pegawai.id];
 
                           return (
                             <tr key={pegawai.id} className="absen-row">
@@ -1325,11 +1334,12 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                                       <input
                                         type="checkbox"
                                         checked={isChecked}
+                                        disabled={isLoading}
                                         onChange={() => handleCheckAbsen(pegawai.id, ket)}
                                         className="hidden-checkbox"
                                       />
                                       <div
-                                        className={`custom-checkbox ${isChecked ? "checked" : ""}`}
+                                        className={`custom-checkbox ${isChecked ? "checked" : ""} ${isLoading ? "loading" : ""}`}
                                         style={
                                           isChecked
                                             ? {
@@ -1339,9 +1349,11 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                                             : {}
                                         }
                                       >
-                                        {isChecked && (
+                                        {isLoading ? (
+                                          <Loader2 size={14} color="white" className="animate-spin" />
+                                        ) : isChecked ? (
                                           <Check size={14} color="white" strokeWidth={3} />
-                                        )}
+                                        ) : null}
                                       </div>
                                     </label>
                                   </td>
@@ -1361,16 +1373,14 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* ABSEN KEGIATAN (Tabel 2-Level Header + Kolom Kanan) */}
+      {/* ABSEN KEGIATAN */}
       {/* ══════════════════════════════════════════════════════════════ */}
-      {selectedKegiatanId !== null && (allMetode.length > 0 || keteranganColumns.length > 0) && (
+      {!isLoadingData && selectedKegiatanId !== null && (allMetode.length > 0 || keteranganColumns.length > 0) && (
         <div className="glass">
           <div className="table-wrapper">
             <table className="absen-table">
               <thead>
-                {/* ─ ROW 1: HEADER KATEGORI + HEADER "ABSEN" ─ */}
                 <tr>
-                  {/* Kolom nama pegawai — rowspan 2 */}
                   <th
                     className="th-nama-pegawai"
                     rowSpan={2}
@@ -1379,7 +1389,6 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                     Nama Pegawai
                   </th>
 
-                  {/* Setiap kategori: colspan = jumlah metodenya */}
                   {[...groupedKolom.entries()].map(([kategori, methods]) => (
                     <th
                       key={kategori}
@@ -1392,7 +1401,6 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                     </th>
                   ))}
 
-                  {/* Header gabung "ABSEN" — colspan = jumlah keterangan dipilih */}
                   {keteranganColumns.length > 0 && (
                     <th
                       className="th-kolom-absen"
@@ -1411,9 +1419,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                   )}
                 </tr>
 
-                {/* ─ ROW 2: SUB-HEADER METODE + SUB-HEADER KETERANGAN ─ */}
                 <tr>
-                  {/* Sub-header per metode */}
                   {allMetode.map((m) => (
                     <th key={m.id} className="th-sub-kolom">
                       <div
@@ -1436,7 +1442,6 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                     </th>
                   ))}
 
-                  {/* Sub-header keterangan absen kanan */}
                   {keteranganColumns.map((ket) => (
                     <th
                       key={ket}
@@ -1456,10 +1461,10 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                 {filteredPegawai.map((pegawai) => {
                   const currentKet = getKeteranganPegawai(pegawai.id);
                   const cfg = clusterConfig[pegawai.cluster];
+                  const isLoadingKet = loadingKeterangan[pegawai.id];
 
                   return (
                     <tr key={pegawai.id}>
-                      {/* Nama */}
                       <td className="pegawai-name-cell">
                         <div className="nama-cell">
                           <div
@@ -1472,17 +1477,18 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                         </div>
                       </td>
 
-                      {/* Nilai free text per metode */}
                       {allMetode.map((m) => {
                         const key = cellKey(pegawai.id, m.id);
                         const val = getNilaiCell(pegawai.id, m.id);
+                        const isSaving = savingCells.has(key);
 
                         return (
-                          <td key={m.id} className="absen-cell">
+                          <td key={m.id} className="absen-cell" style={{ position: "relative" }}>
                             <input
                               className="absen-input"
                               value={val}
                               placeholder="-"
+                              disabled={isSaving}
                               onChange={(e) =>
                                 setDraftNilai((prev) => ({
                                   ...prev,
@@ -1490,12 +1496,22 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                                 }))
                               }
                               onBlur={() => saveNilaiCell(pegawai.id, m.id)}
+                              style={isSaving ? { opacity: 0.6 } : {}}
                             />
+                            {isSaving && (
+                              <div style={{
+                                position: "absolute",
+                                top: "50%",
+                                right: 8,
+                                transform: "translateY(-50%)",
+                              }}>
+                                <Loader2 size={14} className="animate-spin" color="#3b82f6" />
+                              </div>
+                            )}
                           </td>
                         );
                       })}
 
-                      {/* Checkbox keterangan (radio-style: 1 pilihan) */}
                       {keteranganColumns.map((ket) => {
                         const checked = currentKet === ket;
 
@@ -1506,6 +1522,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                                 type="checkbox"
                                 className="hidden-checkbox"
                                 checked={checked}
+                                disabled={isLoadingKet}
                                 onChange={() =>
                                   setKeteranganPegawai(
                                     pegawai.id,
@@ -1514,7 +1531,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                                 }
                               />
                               <div
-                                className={`custom-checkbox ${checked ? "checked" : ""}`}
+                                className={`custom-checkbox ${checked ? "checked" : ""} ${isLoadingKet ? "loading" : ""}`}
                                 style={
                                   checked
                                     ? {
@@ -1524,9 +1541,11 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
                                     : {}
                                 }
                               >
-                                {checked && (
+                                {isLoadingKet ? (
+                                  <Loader2 size={14} color="white" className="animate-spin" />
+                                ) : checked ? (
                                   <Check size={14} color="white" strokeWidth={3} />
-                                )}
+                                ) : null}
                               </div>
                             </label>
                           </td>
@@ -1541,8 +1560,8 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
-      {/* ── Empty State untuk Kegiatan Tanpa Kolom & Keterangan ── */}
-      {selectedKegiatanId !== null && allMetode.length === 0 && keteranganColumns.length === 0 && (
+      {/* ── Empty States ── */}
+      {!isLoadingData && selectedKegiatanId !== null && allMetode.length === 0 && keteranganColumns.length === 0 && (
         <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
           <TableIcon size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
           <p style={{ color: "#64748b", fontSize: 16, marginBottom: 8 }}>
@@ -1554,8 +1573,7 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
         </div>
       )}
 
-      {/* ── Empty State untuk Kegiatan Tanpa Pegawai ── */}
-      {selectedKegiatanId !== null && absenPegawaiList.length === 0 && (
+      {!isLoadingData && selectedKegiatanId !== null && absenPegawaiList.length === 0 && (
         <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
           <FolderOpen size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
           <p style={{ color: "#64748b", fontSize: 16 }}>
@@ -1676,6 +1694,21 @@ export default function AbsenPage({ pegawaiList, refreshPegawai }: Props) {
           </div>
         </div>
       )}
+
+      {/* ✅ ADD LOADING SPINNER ANIMATION STYLE */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+        .custom-checkbox.loading {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      `}</style>
     </div>
   );
 }

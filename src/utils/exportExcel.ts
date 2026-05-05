@@ -37,6 +37,7 @@ interface ExportRekapParams {
   } | null;
 }
 
+// ✅ TAMBAHKAN LEPAS PIKET
 type RekapItem = {
   pegawai: Pegawai;
   hadir: number;
@@ -46,6 +47,7 @@ type RekapItem = {
   sakit: number;
   alpha: number;
   izin: number;
+  lepasPiket: number; // ✅ ADDED
   totalKehadiran: number;
 };
 
@@ -73,7 +75,7 @@ function countWorkingDays(tanggalMulai: string, tanggalSelesai: string): number 
 }
 
 // ══════════════════════════════════════════════════════════════
-// ✅ BUILD REKAP DENGAN FILTER PEGAWAI KOSONG
+// ✅ BUILD REKAP DENGAN FILTER PEGAWAI KOSONG + LEPAS PIKET
 // ══════════════════════════════════════════════════════════════
 function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
   console.log("=".repeat(80));
@@ -94,13 +96,15 @@ function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
     const sakit = pegawaiAbsen.filter((a) => a.keterangan === "Sakit").length;
     const alpha = pegawaiAbsen.filter((a) => a.keterangan === "Alpha").length;
     const izin = pegawaiAbsen.filter((a) => a.keterangan === "Izin").length;
+    const lepasPiket = pegawaiAbsen.filter((a) => a.keterangan === "Lepas Piket").length; // ✅ ADDED
+    
     const totalKehadiran = hadir + dinasLuar + dinasDalam;
 
-    // ✅ HITUNG TOTAL SEMUA AKTIVITAS
-    const totalActivity = hadir + dinasLuar + dinasDalam + cuti + sakit + alpha + izin;
+    // ✅ HITUNG TOTAL SEMUA AKTIVITAS (termasuk Lepas Piket)
+    const totalActivity = hadir + dinasLuar + dinasDalam + cuti + sakit + alpha + izin + lepasPiket;
 
     console.log(
-      `👤 ${pegawai.nama_pegawai.padEnd(45)} | records:${String(pegawaiAbsen.length).padStart(3)} | H:${hadir} DL:${dinasLuar} DD:${dinasDalam} C:${cuti} S:${sakit} A:${alpha} I:${izin} | Total:${totalKehadiran} | Activity:${totalActivity}`
+      `👤 ${pegawai.nama_pegawai.padEnd(45)} | records:${String(pegawaiAbsen.length).padStart(3)} | H:${hadir} DL:${dinasLuar} DD:${dinasDalam} C:${cuti} S:${sakit} A:${alpha} I:${izin} LP:${lepasPiket} | Total:${totalKehadiran} | Activity:${totalActivity}`
     );
 
     // ✅ SKIP JIKA TIDAK ADA DATA SAMA SEKALI
@@ -118,6 +122,7 @@ function buildRekap(pegawaiList: Pegawai[], absenList: Absen[]): RekapItem[] {
       sakit,
       alpha,
       izin,
+      lepasPiket, // ✅ ADDED
       totalKehadiran,
     });
   }
@@ -357,6 +362,23 @@ async function fetchFreshDataFromDB(
     const count = absenList.filter((a) => a.pegawai_id === p.id).length;
     console.log(`   ${p.nama_pegawai}: ${count} records`);
   }
+
+  // ✅ DEBUG CEK PER KETERANGAN
+  console.log("\n📊 Breakdown per keterangan:");
+  const keteranganStats = {
+    "Hadir": absenList.filter(a => a.keterangan === "Hadir").length,
+    "Dinas Luar": absenList.filter(a => a.keterangan === "Dinas Luar").length,
+    "Dinas Dalam": absenList.filter(a => a.keterangan === "Dinas Dalam").length,
+    "Cuti": absenList.filter(a => a.keterangan === "Cuti").length,
+    "Sakit": absenList.filter(a => a.keterangan === "Sakit").length,
+    "Alpha": absenList.filter(a => a.keterangan === "Alpha").length,
+    "Izin": absenList.filter(a => a.keterangan === "Izin").length,
+    "Lepas Piket": absenList.filter(a => a.keterangan === "Lepas Piket").length, // ✅ ADDED
+  };
+  
+  Object.entries(keteranganStats).forEach(([ket, count]) => {
+    console.log(`   ${ket.padEnd(15)}: ${count}`);
+  });
 
   // ══════════════════════════════════════════════════════════════
   // STEP 3: FETCH ABSENSI KEGIATAN (jika mode kegiatan)
@@ -824,7 +846,7 @@ export async function exportToExcel({
           item.sakit || "",
           item.alpha || "",
           item.izin || "",
-          "",
+          item.lepasPiket || "", // ✅ FIXED: Sekarang menampilkan nilai lepas piket
           item.totalKehadiran || "",
         ];
 
