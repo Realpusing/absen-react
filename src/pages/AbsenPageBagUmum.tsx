@@ -18,11 +18,8 @@ import type {
   Absensi,
   AbsensiKeterangan,
 } from "../types";
-import {
-  clusterConfig,
-  keteranganColors,
-} from "../constants";
-import { exportToExcel } from "../utils/exportExcel";
+import { clusterConfig, keteranganColors } from "../constants";
+import { exportKegiatanToExcel } from "../utils/exportExcelKegiatan";
 import { exportToPDF } from "../utils/exportPDF";
 import { formatDateID, getTodayDate } from "../utils/helper";
 
@@ -50,8 +47,10 @@ interface Props {
 // COMPONENT
 // ══════════════════════════════════════════════════════════════
 
-export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props) {
-
+export default function AbsenPageBagUmum({
+  pegawaiList,
+  refreshPegawai,
+}: Props) {
   // ══════════════════════════════════════════════════════════════
   // STATE - KEGIATAN
   // ══════════════════════════════════════════════════════════════
@@ -59,16 +58,24 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [searchTerm, setSearchTerm] = useState("");
   const [kegiatanList, setKegiatanList] = useState<KegiatanExtended[]>([]);
-  const [kegiatanPegawaiRows, setKegiatanPegawaiRows] = useState<KegiatanPegawaiRow[]>([]);
-  const [selectedKegiatanId, setSelectedKegiatanId] = useState<number | null>(null);
+  const [kegiatanPegawaiRows, setKegiatanPegawaiRows] = useState<
+    KegiatanPegawaiRow[]
+  >([]);
+  const [selectedKegiatanId, setSelectedKegiatanId] = useState<number | null>(
+    null
+  );
 
   // ══════════════════════════════════════════════════════════════
   // STATE - KOLOM DINAMIS & ABSENSI KEGIATAN
   // ══════════════════════════════════════════════════════════════
 
   const [kolomAbsenList, setKolomAbsenList] = useState<KolomAbsen[]>([]);
-  const [absensiKegiatanData, setAbsensiKegiatanData] = useState<Absensi[]>([]);
-  const [absensiKeteranganList, setAbsensiKeteranganList] = useState<AbsensiKeterangan[]>([]);
+  const [absensiKegiatanData, setAbsensiKegiatanData] = useState<Absensi[]>(
+    []
+  );
+  const [absensiKeteranganList, setAbsensiKeteranganList] = useState<
+    AbsensiKeterangan[]
+  >([]);
 
   // ══════════════════════════════════════════════════════════════
   // STATE - DRAFT NILAI (save on blur)
@@ -82,10 +89,13 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportTanggalMulai, setExportTanggalMulai] = useState(getTodayDate());
-  const [exportTanggalSelesai, setExportTanggalSelesai] = useState(getTodayDate());
+  const [exportTanggalSelesai, setExportTanggalSelesai] = useState(
+    getTodayDate()
+  );
   const [penanggungJawab, setPenanggungJawab] = useState("");
   const [jabatanPenanggungJawab, setJabatanPenanggungJawab] = useState("");
   const [showPenanggungJawabList, setShowPenanggungJawabList] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const todayDate = getTodayDate();
 
@@ -94,14 +104,15 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
   // ══════════════════════════════════════════════════════════════
 
   const fetchKegiatan = async () => {
-    // ✅ Hanya ambil kegiatan yang dibuat oleh user yang sedang login
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data, error } = await supabase
       .from("kegiatan")
       .select("*")
-      .eq("created_by", user.id) // ✅ Filter hanya kegiatan milik dia
+      .eq("created_by", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -109,11 +120,11 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
       return;
     }
 
-    setKegiatanList((data as KegiatanExtended[]) || []);
+    const list = (data as KegiatanExtended[]) || [];
+    setKegiatanList(list);
 
-    // ✅ Auto select kegiatan pertama jika ada
-    if (data && data.length > 0 && selectedKegiatanId === null) {
-      setSelectedKegiatanId(data[0].id);
+    if (list.length > 0 && selectedKegiatanId === null) {
+      setSelectedKegiatanId(list[0].id);
     }
   };
 
@@ -160,7 +171,10 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
     setAbsensiKegiatanData((data as Absensi[]) || []);
   };
 
-  const fetchAbsensiKeterangan = async (kegiatanId: number, tanggal: string) => {
+  const fetchAbsensiKeterangan = async (
+    kegiatanId: number,
+    tanggal: string
+  ) => {
     const { data, error } = await supabase
       .from("absensi_keterangan")
       .select("*")
@@ -183,6 +197,7 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
     refreshPegawai();
     fetchKegiatan();
     fetchKegiatanPegawai();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -204,6 +219,7 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, selectedKegiatanId]);
 
   // ══════════════════════════════════════════════════════════════
@@ -222,16 +238,29 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
 
   const filteredPegawai = useMemo(() => {
     return absenPegawaiList
-      .filter((p) => p.nama_pegawai.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter((p) =>
+        p.nama_pegawai.toLowerCase().includes(searchTerm.toLowerCase())
+      )
       .sort((a, b) => (a.urutan ?? 999999) - (b.urutan ?? 999999));
   }, [absenPegawaiList, searchTerm]);
 
-  const filteredPenanggungJawab = pegawaiList.filter((pegawai) =>
-    pegawai.nama_pegawai.toLowerCase().includes(penanggungJawab.toLowerCase())
+  const filteredPenanggungJawab = useMemo(() => {
+    return pegawaiList.filter((pegawai) =>
+      pegawai.nama_pegawai
+        .toLowerCase()
+        .includes(penanggungJawab.toLowerCase())
+    );
+  }, [pegawaiList, penanggungJawab]);
+
+  const selectedKegiatan = useMemo(
+    () => kegiatanList.find((k) => k.id === selectedKegiatanId),
+    [kegiatanList, selectedKegiatanId]
   );
 
-  const selectedKegiatan = kegiatanList.find((k) => k.id === selectedKegiatanId);
-  const keteranganColumns = selectedKegiatan?.keterangan_columns ?? [];
+  const keteranganColumns = useMemo(
+    () => selectedKegiatan?.keterangan_columns ?? [],
+    [selectedKegiatan]
+  );
 
   // Group kolom by kategori
   const groupedKolom = useMemo(() => {
@@ -249,21 +278,25 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
   );
 
   const getAssignedCount = (kegiatanId: number) => {
-    return kegiatanPegawaiRows.filter((row) => row.kegiatan_id === kegiatanId).length;
+    return kegiatanPegawaiRows.filter((row) => row.kegiatan_id === kegiatanId)
+      .length;
   };
 
   // ══════════════════════════════════════════════════════════════
   // HELPER FUNCTIONS - NILAI PENILAIAN (save on blur)
   // ══════════════════════════════════════════════════════════════
 
-  const cellKey = (pegawaiId: number, kolomId: number) => `${pegawaiId}_${kolomId}`;
+  const cellKey = (pegawaiId: number, kolomId: number) =>
+    `${pegawaiId}_${kolomId}`;
 
-  const getNilaiCell = (pegawaiId: number, kolomId: number) => {
+  const getNilaiCell = (pegawaiId: number, kolomId: number): string => {
     const key = cellKey(pegawaiId, kolomId);
     if (key in draftNilai) return draftNilai[key];
-    return absensiKegiatanData.find(
-      (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
-    )?.nilai ?? "";
+    return (
+      absensiKegiatanData.find(
+        (a) => a.pegawai_id === pegawaiId && a.kolom_absen_id === kolomId
+      )?.nilai ?? ""
+    );
   };
 
   const saveNilaiCell = async (pegawaiId: number, kolomId: number) => {
@@ -299,20 +332,32 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
           });
           return;
         }
+
         await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
       }
+
+      setDraftNilai((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
       return;
     }
 
     const { error } = await supabase.from("absensi").upsert(
-      [{
-        kegiatan_id: selectedKegiatanId,
-        pegawai_id: pegawaiId,
-        kolom_absen_id: kolomId,
-        nilai,
-        tanggal: selectedDate,
-      }],
-      { onConflict: "kegiatan_id,pegawai_id,kolom_absen_id,sub_kolom,tanggal" }
+      [
+        {
+          kegiatan_id: selectedKegiatanId,
+          pegawai_id: pegawaiId,
+          kolom_absen_id: kolomId,
+          nilai,
+          tanggal: selectedDate,
+        },
+      ],
+      {
+        onConflict:
+          "kegiatan_id,pegawai_id,kolom_absen_id,sub_kolom,tanggal",
+      }
     );
 
     if (error) {
@@ -328,6 +373,12 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
       });
       return;
     }
+
+    setDraftNilai((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
 
     await fetchAbsensiKegiatan(selectedKegiatanId, selectedDate);
   };
@@ -379,12 +430,14 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
     }
 
     const { error } = await supabase.from("absensi_keterangan").upsert(
-      [{
-        kegiatan_id: selectedKegiatanId,
-        pegawai_id: pegawaiId,
-        tanggal: selectedDate,
-        keterangan: ket,
-      }],
+      [
+        {
+          kegiatan_id: selectedKegiatanId,
+          pegawai_id: pegawaiId,
+          tanggal: selectedDate,
+          keterangan: ket,
+        },
+      ],
       { onConflict: "kegiatan_id,pegawai_id,tanggal" }
     );
 
@@ -416,7 +469,7 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
   };
 
   // ══════════════════════════════════════════════════════════════
-  // EXPORT
+  // EXPORT HANDLERS
   // ══════════════════════════════════════════════════════════════
 
   const handleSelectPenanggungJawab = (pegawai: Pegawai) => {
@@ -431,40 +484,92 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
     setShowExportModal(true);
   };
 
-  const confirmExportExcel = () => {
-    let kegiatanInfo = null;
-    if (selectedKegiatanId !== null && selectedKegiatan) {
-      const instrukturNama = selectedKegiatan.instruktur_id
-        ? pegawaiList.find((p) => p.id === selectedKegiatan.instruktur_id)?.nama_pegawai
-        : null;
-      const asistenNama = selectedKegiatan.asisten_id
-        ? pegawaiList.find((p) => p.id === selectedKegiatan.asisten_id)?.nama_pegawai
-        : null;
-      const pejabatNama = selectedKegiatan.pejabat_id
-        ? pegawaiList.find((p) => p.id === selectedKegiatan.pejabat_id)?.nama_pegawai
-        : null;
-
-      kegiatanInfo = {
-        instruktur: instrukturNama,
-        asisten: asistenNama,
-        pejabat: pejabatNama,
-        materi: selectedKegiatan.materi,
-      };
+  const confirmExportExcel = async () => {
+    if (!selectedKegiatan || !selectedKegiatanId) {
+      Swal.fire({
+        icon: "warning",
+        title: "Tidak Ada Kegiatan",
+        text: "Pilih kegiatan terlebih dahulu sebelum export.",
+        confirmButtonColor: "#3b82f6",
+      });
+      return;
     }
 
+    setIsExporting(true);
+
+    // ✅ Fetch data absensi sesuai periode export (bukan hanya tanggal aktif)
+    let exportAbsensiData: Absensi[] = [];
+    let exportKeteranganData: AbsensiKeterangan[] = [];
+
     try {
-      exportToExcel({
+      const { data: absenData, error: absenError } = await supabase
+        .from("absensi")
+        .select("*")
+        .eq("kegiatan_id", selectedKegiatanId)
+        .gte("tanggal", exportTanggalMulai)
+        .lte("tanggal", exportTanggalSelesai);
+
+      if (absenError) throw new Error(absenError.message);
+      exportAbsensiData = (absenData as Absensi[]) || [];
+
+      const { data: ketData, error: ketError } = await supabase
+        .from("absensi_keterangan")
+        .select("*")
+        .eq("kegiatan_id", selectedKegiatanId)
+        .gte("tanggal", exportTanggalMulai)
+        .lte("tanggal", exportTanggalSelesai);
+
+      if (ketError) throw new Error(ketError.message);
+      exportKeteranganData = (ketData as AbsensiKeterangan[]) || [];
+
+    } catch (error: unknown) {
+      setIsExporting(false);
+      const message =
+        error instanceof Error ? error.message : "Gagal mengambil data";
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Ambil Data",
+        text: message,
+        confirmButtonColor: "#3b82f6",
+      });
+      return;
+    }
+
+    const instrukturNama = selectedKegiatan.instruktur_id
+      ? pegawaiList.find((p) => p.id === selectedKegiatan.instruktur_id)
+          ?.nama_pegawai ?? null
+      : null;
+
+    const asistenNama = selectedKegiatan.asisten_id
+      ? pegawaiList.find((p) => p.id === selectedKegiatan.asisten_id)
+          ?.nama_pegawai ?? null
+      : null;
+
+    const pejabatNama = selectedKegiatan.pejabat_id
+      ? pegawaiList.find((p) => p.id === selectedKegiatan.pejabat_id)
+          ?.nama_pegawai ?? null
+      : null;
+
+    const kegiatanInfo = {
+      instruktur: instrukturNama,
+      asisten: asistenNama,
+      pejabat: pejabatNama,
+      materi: selectedKegiatan.materi ?? null,
+    };
+
+    try {
+      exportKegiatanToExcel({
         pegawaiList: absenPegawaiList,
         absenList: [],
-        kegiatanLabel: selectedKegiatan?.nama_kegiatan || "Rekap Absen",
+        kegiatanLabel: selectedKegiatan.nama_kegiatan || "Rekap Absen",
         tanggalMulai: exportTanggalMulai,
         tanggalSelesai: exportTanggalSelesai,
         penanggungJawab,
         jabatanPenanggungJawab,
         hariKerja: 22,
         kolomAbsenList,
-        absensiData: absensiKegiatanData,
-        absensiKeteranganData: absensiKeteranganList,
+        absensiData: exportAbsensiData,
+        absensiKeteranganData: exportKeteranganData,
         keteranganColumns: keteranganColumns as KeteranganAbsen[],
         isKegiatanMode: true,
         kegiatanInfo,
@@ -482,13 +587,19 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
         timer: 3000,
         showConfirmButton: false,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat export";
       Swal.fire({
         icon: "error",
         title: "Export Gagal!",
-        text: error.message || "Terjadi kesalahan saat export",
+        text: message,
         confirmButtonColor: "#3b82f6",
       });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -496,7 +607,7 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
     try {
       exportToPDF({
         absenPegawaiList,
-        getAbsenStatus: () => null, // ✅ Tidak ada absen harian
+        getAbsenStatus: () => null,
         selectedDate,
         kegiatanLabel: selectedKegiatan?.nama_kegiatan || "Kegiatan",
       });
@@ -511,11 +622,15 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
         timer: 3000,
         showConfirmButton: false,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat export PDF";
       Swal.fire({
         icon: "error",
         title: "Export Gagal!",
-        text: error.message || "Terjadi kesalahan saat export PDF",
+        text: message,
         confirmButtonColor: "#3b82f6",
       });
     }
@@ -527,7 +642,6 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
 
   return (
     <div className="page">
-
       {/* ── Header ── */}
       <div className="glass page-header-card">
         <div className="header-top">
@@ -570,15 +684,18 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
         <p className="kegiatan-tabs-label">Pilih Kegiatan:</p>
         <div className="kegiatan-tabs">
           {kegiatanList.length === 0 ? (
-            // ✅ Empty state kalau tidak ada kegiatan
-            <div style={{ padding: "12px 16px", color: "#94a3b8", fontSize: 14 }}>
+            <div
+              style={{ padding: "12px 16px", color: "#94a3b8", fontSize: 14 }}
+            >
               Belum ada kegiatan yang kamu buat.
             </div>
           ) : (
             kegiatanList.map((k) => (
               <button
                 key={k.id}
-                className={`kegiatan-tab ${selectedKegiatanId === k.id ? "active" : ""}`}
+                className={`kegiatan-tab ${
+                  selectedKegiatanId === k.id ? "active" : ""
+                }`}
                 onClick={() => setSelectedKegiatanId(k.id)}
               >
                 <FolderOpen size={16} />
@@ -593,13 +710,13 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
       </div>
 
       {/* ── Info Kegiatan ── */}
-      {selectedKegiatanId !== null && (
+      {selectedKegiatanId !== null && selectedKegiatan && (
         <div className="glass kegiatan-info-card">
           <div className="kegiatan-info-row">
             <FolderOpen size={20} color="#3b82f6" />
             <div>
-              <strong>{selectedKegiatan?.nama_kegiatan}</strong>
-              {selectedKegiatan?.deskripsi && (
+              <strong>{selectedKegiatan.nama_kegiatan}</strong>
+              {selectedKegiatan.deskripsi && (
                 <p className="kegiatan-desc">{selectedKegiatan.deskripsi}</p>
               )}
             </div>
@@ -623,11 +740,17 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
               style={{ marginBottom: 0 }}
             />
             <div className="export-buttons">
-              <button className="btn-export btn-excel" onClick={handleExportExcel}>
+              <button
+                className="btn-export btn-excel"
+                onClick={handleExportExcel}
+              >
                 <FileSpreadsheet size={18} />
                 <span>Excel</span>
               </button>
-              <button className="btn-export btn-pdf" onClick={handleExportPDF}>
+              <button
+                className="btn-export btn-pdf"
+                onClick={handleExportPDF}
+              >
                 <File size={18} />
                 <span>PDF</span>
               </button>
@@ -637,7 +760,7 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* ABSEN KEGIATAN (Tabel 2-Level Header + Kolom Kanan) */}
+      {/* TABEL ABSENSI KEGIATAN */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {selectedKegiatanId !== null &&
         (allMetode.length > 0 || keteranganColumns.length > 0) && (
@@ -672,12 +795,16 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
                         className="th-kolom-absen"
                         colSpan={keteranganColumns.length}
                         style={{
-                          background: "linear-gradient(135deg,#e0f2fe,#bae6fd)",
+                          background:
+                            "linear-gradient(135deg,#e0f2fe,#bae6fd)",
                           borderLeft: "3px solid #0ea5e9",
                         }}
                       >
                         <div className="th-kolom-content">
-                          <div className="th-kategori" style={{ color: "#0369a1" }}>
+                          <div
+                            className="th-kategori"
+                            style={{ color: "#0369a1" }}
+                          >
                             ABSEN
                           </div>
                         </div>
@@ -731,88 +858,121 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
                 </thead>
 
                 <tbody>
-                  {filteredPegawai.map((pegawai) => {
-                    const currentKet = getKeteranganPegawai(pegawai.id);
-                    const cfg = clusterConfig[pegawai.cluster];
+                  {filteredPegawai.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={
+                          1 + allMetode.length + keteranganColumns.length
+                        }
+                        style={{
+                          textAlign: "center",
+                          padding: "40px 20px",
+                          color: "#94a3b8",
+                        }}
+                      >
+                        {searchTerm
+                          ? "Pegawai tidak ditemukan."
+                          : "Belum ada pegawai di kegiatan ini."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPegawai.map((pegawai) => {
+                      const currentKet = getKeteranganPegawai(pegawai.id);
+                      const cfg = clusterConfig[pegawai.cluster];
 
-                    return (
-                      <tr key={pegawai.id}>
-                        {/* Nama */}
-                        <td className="pegawai-name-cell">
-                          <div className="nama-cell">
-                            <div
-                              className="avatar"
-                              style={{ background: cfg.gradient }}
-                            >
-                              {pegawai.nama_pegawai.charAt(0).toUpperCase()}
+                      return (
+                        <tr key={pegawai.id}>
+                          {/* Nama */}
+                          <td className="pegawai-name-cell">
+                            <div className="nama-cell">
+                              <div
+                                className="avatar"
+                                style={{ background: cfg?.gradient }}
+                              >
+                                {pegawai.nama_pegawai
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </div>
+                              <span className="nama-text">
+                                {pegawai.nama_pegawai}
+                              </span>
                             </div>
-                            <span className="nama-text">{pegawai.nama_pegawai}</span>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Nilai free text per metode */}
-                        {allMetode.map((m) => {
-                          const key = cellKey(pegawai.id, m.id);
-                          const val = getNilaiCell(pegawai.id, m.id);
+                          {/* Nilai free text per metode */}
+                          {allMetode.map((m) => {
+                            const key = cellKey(pegawai.id, m.id);
+                            const val = getNilaiCell(pegawai.id, m.id);
 
-                          return (
-                            <td key={m.id} className="absen-cell">
-                              <input
-                                className="absen-input"
-                                value={val}
-                                placeholder="-"
-                                onChange={(e) =>
-                                  setDraftNilai((prev) => ({
-                                    ...prev,
-                                    [key]: e.target.value,
-                                  }))
-                                }
-                                onBlur={() => saveNilaiCell(pegawai.id, m.id)}
-                              />
-                            </td>
-                          );
-                        })}
-
-                        {/* Checkbox keterangan (radio-style) */}
-                        {keteranganColumns.map((ket) => {
-                          const checked = currentKet === ket;
-
-                          return (
-                            <td key={ket} className="absen-cell">
-                              <label className="checkbox-wrapper">
+                            return (
+                              <td key={m.id} className="absen-cell">
                                 <input
-                                  type="checkbox"
-                                  className="hidden-checkbox"
-                                  checked={checked}
-                                  onChange={() =>
-                                    setKeteranganPegawai(
-                                      pegawai.id,
-                                      checked ? null : ket
-                                    )
+                                  className="absen-input"
+                                  value={val}
+                                  placeholder="-"
+                                  onChange={(e) =>
+                                    setDraftNilai((prev) => ({
+                                      ...prev,
+                                      [key]: e.target.value,
+                                    }))
+                                  }
+                                  onBlur={() =>
+                                    saveNilaiCell(pegawai.id, m.id)
                                   }
                                 />
-                                <div
-                                  className={`custom-checkbox ${checked ? "checked" : ""}`}
-                                  style={
-                                    checked
-                                      ? {
-                                          background: keteranganColors[ket],
-                                          borderColor: keteranganColors[ket],
-                                        }
-                                      : {}
-                                  }
-                                >
-                                  {checked && (
-                                    <Check size={14} color="white" strokeWidth={3} />
-                                  )}
-                                </div>
-                              </label>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
+                              </td>
+                            );
+                          })}
+
+                          {/* Checkbox keterangan (radio-style) */}
+                          {keteranganColumns.map((ket) => {
+                            const checked = currentKet === ket;
+
+                            return (
+                              <td key={ket} className="absen-cell">
+                                <label className="checkbox-wrapper">
+                                  <input
+                                    type="checkbox"
+                                    className="hidden-checkbox"
+                                    checked={checked}
+                                    onChange={() =>
+                                      setKeteranganPegawai(
+                                        pegawai.id,
+                                        checked ? null : ket
+                                      )
+                                    }
+                                  />
+                                  <div
+                                    className={`custom-checkbox ${
+                                      checked ? "checked" : ""
+                                    }`}
+                                    style={
+                                      checked
+                                        ? {
+                                            background:
+                                              keteranganColors[ket],
+                                            borderColor:
+                                              keteranganColors[ket],
+                                          }
+                                        : {}
+                                    }
+                                  >
+                                    {checked && (
+                                      <Check
+                                        size={14}
+                                        color="white"
+                                        strokeWidth={3}
+                                      />
+                                    )}
+                                  </div>
+                                </label>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -823,21 +983,36 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
       {selectedKegiatanId !== null &&
         allMetode.length === 0 &&
         keteranganColumns.length === 0 && (
-          <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
-            <TableIcon size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
+          <div
+            className="glass"
+            style={{ textAlign: "center", padding: "60px 20px" }}
+          >
+            <TableIcon
+              size={48}
+              color="#94a3b8"
+              style={{ marginBottom: 16 }}
+            />
             <p style={{ color: "#64748b", fontSize: 16, marginBottom: 8 }}>
               Belum ada kolom penilaian atau kolom absen untuk kegiatan ini.
             </p>
             <p style={{ color: "#94a3b8", fontSize: 14 }}>
-              Silakan tambahkan di halaman <strong>Kelola Kegiatan</strong>.
+              Silakan tambahkan di halaman{" "}
+              <strong>Kelola Kegiatan</strong>.
             </p>
           </div>
         )}
 
       {/* ── Empty State: Kegiatan Tanpa Pegawai ── */}
       {selectedKegiatanId !== null && absenPegawaiList.length === 0 && (
-        <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
-          <FolderOpen size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
+        <div
+          className="glass"
+          style={{ textAlign: "center", padding: "60px 20px" }}
+        >
+          <FolderOpen
+            size={48}
+            color="#94a3b8"
+            style={{ marginBottom: 16 }}
+          />
           <p style={{ color: "#64748b", fontSize: 16 }}>
             Belum ada pegawai yang di-assign ke kegiatan ini.
           </p>
@@ -846,13 +1021,21 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
 
       {/* ── Empty State: Tidak Ada Kegiatan ── */}
       {kegiatanList.length === 0 && (
-        <div className="glass" style={{ textAlign: "center", padding: "60px 20px" }}>
-          <FolderOpen size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
+        <div
+          className="glass"
+          style={{ textAlign: "center", padding: "60px 20px" }}
+        >
+          <FolderOpen
+            size={48}
+            color="#94a3b8"
+            style={{ marginBottom: 16 }}
+          />
           <p style={{ color: "#64748b", fontSize: 16, marginBottom: 8 }}>
             Belum ada kegiatan yang kamu buat.
           </p>
           <p style={{ color: "#94a3b8", fontSize: 14 }}>
-            Silakan buat kegiatan di halaman <strong>Kelola Kegiatan</strong>.
+            Silakan buat kegiatan di halaman{" "}
+            <strong>Kelola Kegiatan</strong>.
           </p>
         </div>
       )}
@@ -861,7 +1044,10 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
       {/* MODAL EXPORT */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showExportModal && (
-        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowExportModal(false)}
+        >
           <div
             className="modal-content export-modal"
             onClick={(e) => e.stopPropagation()}
@@ -924,7 +1110,9 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
                           key={pegawai.id}
                           type="button"
                           className="autocomplete-item"
-                          onClick={() => handleSelectPenanggungJawab(pegawai)}
+                          onClick={() =>
+                            handleSelectPenanggungJawab(pegawai)
+                          }
                         >
                           <div className="autocomplete-name">
                             {pegawai.nama_pegawai}
@@ -944,11 +1132,15 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
               </div>
 
               <div className="export-field">
-                <label className="export-label">Jabatan Penanggung Jawab</label>
+                <label className="export-label">
+                  Jabatan Penanggung Jawab
+                </label>
                 <input
                   type="text"
                   value={jabatanPenanggungJawab}
-                  onChange={(e) => setJabatanPenanggungJawab(e.target.value)}
+                  onChange={(e) =>
+                    setJabatanPenanggungJawab(e.target.value)
+                  }
                   placeholder="Otomatis terisi dari pegawai"
                   className="form-input"
                 />
@@ -956,12 +1148,19 @@ export default function AbsenPageBagUmum({ pegawaiList, refreshPegawai }: Props)
             </div>
 
             <div className="export-footer">
-              <button className="btn-primary" onClick={confirmExportExcel}>
-                Download Excel
+              {/* ✅ Tombol disabled + loading saat proses export */}
+              <button
+                className="btn-primary"
+                onClick={confirmExportExcel}
+                disabled={isExporting}
+                style={{ opacity: isExporting ? 0.7 : 1 }}
+              >
+                {isExporting ? "Memproses..." : "Download Excel"}
               </button>
               <button
                 className="btn-secondary"
                 onClick={() => setShowExportModal(false)}
+                disabled={isExporting}
               >
                 Batal
               </button>
